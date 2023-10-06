@@ -12,22 +12,37 @@ pub use crate::approx::*;
 pub struct Softmax
 {
   pub weights: Array2<f64>,
-  pub bias: Array1<f64>,
-  image: Option<Array3<f64>>,
-  flattened: Option<Array1<f64>>,
-  output: Option<Array1<f64>>
+  pub bias: Array1<f64>
+  //image: Option<Array3<f64>>,
+  //flattened: Option<Array1<f64>>,
+  //output: Option<Array1<f64>>
 }
 
-pub struct State {
-  image: Array3<f64>,
-  flattened: Array1<f64>,
-  dot_result: Array1<f64>,
-  probabilities: Array3<f64>
+pub struct SoftmaxContext<'a> {
+  alpha: f64,
+  input: Option<&'a Array3<f64>>,
+  flattened: Option<Array1<f64>>,
+  dot_result: Option<Array1<f64>>,
+  output: Option<Array1<f64>>
 }
 
 pub struct TrainingData 
 {
   pub layers: Vec<Array2<f64>>
+}
+
+impl<'a> SoftmaxContext<'a> {
+  pub fn 
+  new (alpha: f64) -> Self 
+  {
+    SoftmaxContext { 
+      alpha: alpha, 
+      input: None, 
+      flattened: None, 
+      dot_result: None, 
+      output: None
+    }
+  }
 }
 
 /// The softmax function converts a vector of K real numbers into a probability distribution of 
@@ -59,10 +74,10 @@ impl Softmax {
 
     Softmax {
       weights: weights,
-      bias: bias,
-      image: None,
-      flattened: None,
-      output: None
+      bias: bias
+      //image: None,
+      //flattened: None,
+      //output: None
     }
   }
 
@@ -74,35 +89,41 @@ impl Softmax {
 
     Softmax {
       weights: weights,
-      bias: bias,
-      image: Some(image.clone()),
-      flattened: None,
-      output: None
+      bias: bias
+      //image: Some(image.clone()),
+      //flattened: None,
+      //output: None
     }
   }
 
   pub fn 
-  forward_propagation (&mut self, image: &Array3<f64>) -> Array1<f64> 
+  forward_propagation<'a> (&mut self, input: &'a Array3<f64>, ctx: &mut SoftmaxContext<'a>) -> Array1<f64> 
   {
-    self.image = Some(image.clone());
+    //self.image = Some(input.clone());
 
-    let flattened: Array1<f64> = image.to_owned().into_shape((image.len(),)).unwrap();
-    self.flattened = Some(flattened.clone());
+    let flattened: Array1<f64> = input.to_owned().into_shape((input.len(),)).unwrap();
+    //self.flattened = Some(flattened.clone());
 
     let x = flattened.dot(&self.weights).add(&self.bias);
-    self.output = Some(x.clone());
+    //self.output = Some(x.clone());
+    let probabilities = softmax(&x);
 
-    softmax(&x)
+    ctx.input = Some(input);
+    ctx.flattened = Some(flattened);
+    ctx.dot_result = Some(x);
+    ctx.output = Some(probabilities.clone());
+
+    probabilities
   }
 
   pub fn 
-  back_propagation (&mut self, dE_dY: &Array1<f64>, alpha: f64) -> Array3<f64>
+  back_propagation (&mut self, dE_dY: &Array1<f64>, ctx: &SoftmaxContext) -> Array3<f64>
   {
     let mut indx = 0;
 
     for gradient in dE_dY {
       if (*gradient) != 0.0 {
-        let transformation_eq = self.output.as_ref().unwrap().mapv(f64::exp);
+        let transformation_eq = ctx.dot_result.as_ref().unwrap().mapv(f64::exp);
         let S_total = transformation_eq.sum();
 
         let mut dY_dZ: Array1<f64> = -transformation_eq[indx] * transformation_eq.clone() / S_total.pow(2);
@@ -110,7 +131,7 @@ impl Softmax {
 
         //println!("dy_dz shape {:?}", dY_dZ.shape());
 
-        let dZ_dw = self.flattened.as_ref().unwrap();
+        let dZ_dw = ctx.flattened.as_ref().unwrap();
         //println!("dZ_dw shape {:?}", dZ_dw.shape());
         let dZ_db = 1.0 as f64;
         let dZ_dX = self.weights.clone();
@@ -129,15 +150,15 @@ impl Softmax {
 
         //println!("dE_dX shape {:?}", dE_dX.shape());
 
-        self.weights = self.weights.clone().sub(alpha * dE_dw);
-        self.bias = self.bias.clone().sub(alpha * dE_db);
+        self.weights = self.weights.clone().sub(ctx.alpha * dE_dw);
+        self.bias = self.bias.clone().sub(ctx.alpha * dE_db);
 
         // println!("de_dx shape: {:?} data {:?}", dE_dX.shape(), dE_dX);
         // println!("image {:?}", self.image.as_ref().unwrap().shape());
 
         return reshape_to_3d(
           dE_dX.clone().into_dyn(), 
-          self.image.as_ref().unwrap().shape()
+          ctx.input.unwrap().shape()
         ).unwrap();
       }
 
@@ -145,7 +166,7 @@ impl Softmax {
     }
 
     //println!("returning ALL ZEROES WTF");
-    Array3::zeros(self.image.as_ref().unwrap().raw_dim())
+    Array3::zeros(ctx.input.unwrap().raw_dim())
   }
 }
 
@@ -205,7 +226,8 @@ mod tests
     let image = Array3::<f64>::ones((2, 2, 3)); // adjust shape as necessary
 
     let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
-    let result = softmax.forward_propagation(&image);
+    let mut ctx = SoftmaxContext::new(0.01);
+    let result = softmax.forward_propagation(&image, &mut ctx);
 
     assert_eq!(result.dim(), output_size, "Output shape is incorrect");
   }
@@ -216,10 +238,12 @@ mod tests
   {
     let input_size = 12;
     let output_size = 3;
-    let image = Array3::<f64>::ones((2, 2, 3)); 
+    let image = Array3::<f64>::ones((2, 2, 3));
 
     let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
-    let result = softmax.forward_propagation(&image);
+    let mut ctx = SoftmaxContext::new(0.01);
+
+    let result = softmax.forward_propagation(&image, &mut ctx);
 
     // Ensure that all probabilities are between 0 and 1 and they sum to 1
     for &prob in result.iter() {
@@ -237,11 +261,13 @@ mod tests
     let image = Array3::<f64>::ones((2, 2, 3)); 
 
     let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
-    softmax.forward_propagation(&image);
+    let mut ctx = SoftmaxContext::new(0.01);
+
+    softmax.forward_propagation(&image, &mut ctx);
 
     // Ensure that `flattened` and `output` are Some after forward_propagation
-    assert!(softmax.flattened.is_some(), "`flattened` not updated");
-    assert!(softmax.output.is_some(), "`output` not updated");
+    assert!(ctx.flattened.is_some(), "`flattened` not updated");
+    assert!(ctx.output.is_some(), "`output` not updated");
   }
 
   #[test]
@@ -253,10 +279,12 @@ mod tests
     let image = Array3::<f64>::ones((2, 2, 3));
 
     let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
-    softmax.forward_propagation(&image);
+    let mut ctx = SoftmaxContext::new(0.01);
+
+    softmax.forward_propagation(&image, &mut ctx);
 
     let dE_dY = Array1::ones(output_size);
-    let result = softmax.back_propagation(&dE_dY, 0.01);
+    let result = softmax.back_propagation(&dE_dY, &ctx);
 
     assert_eq!(result.shape(), image.shape(), "Output shape of dE_dX is incorrect");
   }
@@ -270,10 +298,12 @@ mod tests
     let image = Array3::<f64>::ones((13, 13, 16));
 
     let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
-    softmax.forward_propagation(&image);
+    let mut ctx = SoftmaxContext::new(0.01);
+    
+    softmax.forward_propagation(&image, &mut ctx);
 
     let dE_dY = Array1::ones(output_size);
-    let result = softmax.back_propagation(&dE_dY, 0.01);
+    let result = softmax.back_propagation(&dE_dY, &ctx);
 
     assert_eq!(result.shape(), image.shape(), "Output shape of dE_dX is incorrect");
   }
@@ -287,12 +317,14 @@ mod tests
     let image = Array3::<f64>::ones((2, 2, 3));
 
     let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut ctx = SoftmaxContext::new(0.01);
+
     let original_weights = softmax.weights.clone();
     let original_bias = softmax.bias.clone();
     
-    softmax.forward_propagation(&image);
+    softmax.forward_propagation(&image, &mut ctx);
     let dE_dY = Array1::ones(output_size);
-    softmax.back_propagation(&dE_dY, 0.01);
+    softmax.back_propagation(&dE_dY, &ctx);
 
     assert_ne!(original_weights, softmax.weights, "Weights not modified");
     assert_ne!(original_bias, softmax.bias, "Bias not modified");
@@ -307,12 +339,14 @@ mod tests
     let image = Array3::<f64>::ones((2, 2, 3));
 
     let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut ctx = SoftmaxContext::new(0.01);
+
     let original_weights = softmax.weights.clone();
     let original_bias = softmax.bias.clone();
     
-    softmax.forward_propagation(&image);
+    softmax.forward_propagation(&image, &mut ctx);
     let dE_dY = Array1::zeros(output_size);
-    softmax.back_propagation(&dE_dY, 0.01);
+    softmax.back_propagation(&dE_dY, &ctx);
 
     assert_eq!(original_weights, softmax.weights, "Weights modified unexpectedly");
     assert_eq!(original_bias, softmax.bias, "Bias modified unexpectedly");

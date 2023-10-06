@@ -12,8 +12,22 @@ pub use crate::patch::*;
 pub struct Pooling {
   kernel_rows: usize,
   kernel_cols: usize,
-  num_kernels: usize,
-  image: Option<Array3<f64>>
+  num_kernels: usize
+  //image: Option<Array3<f64>>
+}
+
+pub struct PoolingContext<'a> {
+  input: Option<&'a Array3<f64>>
+}
+
+impl<'a> PoolingContext<'a> {
+  pub fn 
+  new () -> Self
+  {
+    PoolingContext { 
+      input: None 
+    }
+  }
 }
 
 impl Pooling {
@@ -26,23 +40,8 @@ impl Pooling {
     Pooling { 
       kernel_rows: kernel_rows,
       kernel_cols: kernel_cols,
-      num_kernels: num_kernels,
-      image: None
-    }
-  }
-
-  pub fn 
-  init_for_test (
-    kernel_rows: usize,
-    kernel_cols: usize,
-    num_kernels: usize,
-    image: Array3<f64>) -> Self
-  {
-    Pooling { 
-      kernel_rows: kernel_rows,
-      kernel_cols: kernel_cols,
-      num_kernels: num_kernels,
-      image: Some(image)
+      num_kernels: num_kernels
+      //image: None
     }
   }
 
@@ -73,17 +72,22 @@ impl Pooling {
   }
 
   pub fn 
-  forward_propagation (&mut self, image: &Array3<f64>) -> Array3<f64>
+  forward_propagation<'a> (
+    &mut self, 
+    input: &'a Array3<f64>, 
+    ctx: &mut PoolingContext<'a>
+  ) -> Array3<f64>
   {
-    self.image = Some(image.clone());
+    //self.image = Some(image.clone());
+    ctx.input = Some(input);
 
     let mut a: Array3<f64> = Array3::zeros((
-      image.shape()[0] / self.kernel_rows, 
-      image.shape()[1] / self.kernel_cols, 
-      image.shape()[2]
+      input.shape()[0] / self.kernel_rows, 
+      input.shape()[1] / self.kernel_cols, 
+      input.shape()[2]
     ));
 
-    for p in self.patches(image).iter() {
+    for p in self.patches(input).iter() {
       let depth = p.data.dim().2;
       let v: Vec<f64> = (0..depth).map(|i| {
         p.data.slice(s![.., .., i])
@@ -97,12 +101,12 @@ impl Pooling {
   }
 
   pub fn 
-  back_propagation (&self, dE_dY: &Array3<f64>) -> Array3<f64>
+  back_propagation (&self, dE_dY: &Array3<f64>, ctx: &PoolingContext) -> Array3<f64>
   {
-    let mut dE_dk: Array3<f64> = Array3::zeros(self.image.as_ref().unwrap().raw_dim());
+    let mut dE_dk: Array3<f64> = Array3::zeros(ctx.input.unwrap().raw_dim());
 
     // lazy state?
-    for p in self.patches(&self.image.as_ref().unwrap()) {
+    for p in self.patches(&ctx.input.unwrap()) {
       let width = p.data.shape()[0];
       let height = p.data.shape()[1];
       let num_kernels = p.data.shape()[2];
@@ -216,8 +220,9 @@ mod tests {
   {
     let image = Array3::<f64>::zeros((26, 26, 16));
     let mut pooling = Pooling::new(2, 2, 2);
+    let mut ctx = PoolingContext::new();
 
-    let result = pooling.forward_propagation(&image);
+    let result = pooling.forward_propagation(&image, &mut ctx);
     
     assert_eq!(result.dim(), (13, 13, 16), "Output has incorrect shape");
   }
@@ -233,7 +238,9 @@ mod tests {
     ).unwrap();
 
     let mut pooling = Pooling::new(2, 2, 3);
-    let result = pooling.forward_propagation(&image);
+    let mut ctx = PoolingContext::new();
+
+    let result = pooling.forward_propagation(&image, &mut ctx);
 
     // Manually verify and compare some values from the result.
     // You might want to check more values or use different input data for thorough testing
@@ -247,10 +254,13 @@ mod tests {
   test_back_propagation_output_shape () 
   {
     let image = Array3::<f64>::zeros((26, 26, 16));
-    let pooling = Pooling::init_for_test(2, 2, 2, image);
+    let mut pooling = Pooling::new(2, 2, 2);
+    let mut ctx = PoolingContext::new();
+
     let dE_dY = Array3::<f64>::zeros((26, 26, 16));
 
-    let result = pooling.back_propagation(&dE_dY);
+    pooling.forward_propagation(&image, &mut ctx);
+    let result = pooling.back_propagation(&dE_dY, &ctx);
 
     assert_eq!(result.dim(), (26, 26, 16), "Output has incorrect shape");
   }

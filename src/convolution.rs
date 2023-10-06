@@ -14,8 +14,24 @@ pub struct Convolution {
   num_kernels: usize,
   rows: usize,
   cols: usize,
-  pub kernels: Array3<f64>,
-  image: Option<Array2<f64>>
+  pub kernels: Array3<f64>
+  //image: Option<Array2<f64>>
+}
+
+pub struct ConvolutionContext<'a> {
+  alpha: f64,
+  input: Option<&'a Array2<f64>>
+}
+
+impl<'a> ConvolutionContext<'a> {
+  pub fn
+  new (alpha: f64) -> Self
+  {
+    ConvolutionContext { 
+      alpha: alpha, 
+      input: None
+    }
+  }
 }
 
 impl Convolution {
@@ -34,13 +50,13 @@ impl Convolution {
       num_kernels:num_kernels, 
       rows: rows, 
       cols: cols, 
-      kernels: kernels,
-      image: None
+      kernels: kernels
+      //image: None
     }
   }
 
   pub fn 
-  init_for_test (num_kernels: usize, rows: usize, cols: usize, image: Array2<f64>) -> Self
+  init_for_test (num_kernels: usize, rows: usize, cols: usize) -> Self
   {
     let mut kernels: Array3<f64> = Array3::zeros((num_kernels, rows, cols));
 
@@ -53,8 +69,8 @@ impl Convolution {
       num_kernels:num_kernels, 
       rows: rows, 
       cols: cols, 
-      kernels: kernels,
-      image: Some(image)
+      kernels: kernels
+      //image: Some(image)
     }
   }
 
@@ -63,7 +79,7 @@ impl Convolution {
   {
     let mut data: Vec<Patch> = Vec::new();
 
-    self.image = Some(image.clone());
+    //self.image = Some(image.clone());
 
     for x in 0..(image.shape()[0] - self.rows + 1) {
       for y in 0..(image.shape()[1] - self.cols + 1) {
@@ -81,8 +97,14 @@ impl Convolution {
   }
 
   pub fn 
-  forward_propagation (&mut self, image: &Array2<f64>) -> Array3<f64> 
+  forward_propagation<'a> (
+    &mut self, 
+    image: &'a Array2<f64>, 
+    ctx: &mut ConvolutionContext<'a>
+  ) -> Array3<f64> 
   {
+    ctx.input = Some(image);
+
     let mut a: Array3<f64> = Array3::zeros((
       image.shape()[0] - self.rows + 1, 
       image.shape()[1] - self.cols + 1, 
@@ -101,19 +123,19 @@ impl Convolution {
   }
 
   pub fn 
-  back_propagation (&mut self, dE_dY: &Array3<f64>, alpha: f64) -> Array3<f64>
+  back_propagation (&mut self, dE_dY: &Array3<f64>, ctx: &ConvolutionContext) -> Array3<f64>
   { 
     let mut dE_dk: Array3<f64> = Array3::zeros([self.kernels.shape()[0], self.rows, self.cols]);
 
     for p in self.patches(
-      &self.image.as_ref().unwrap().clone()
+      &ctx.input.unwrap()
     ) {
       for k in 0..self.num_kernels {
         dE_dk.slice_mut(s![k, .., ..]).scaled_add(dE_dY[[p.x, p.y, k]], &p.data);
       }
     }
 
-    self.kernels = self.kernels.clone().sub(alpha * dE_dk.clone());
+    self.kernels = self.kernels.clone().sub(ctx.alpha * dE_dk.clone());
 
     dE_dk
   }
@@ -137,7 +159,6 @@ mod tests {
       assert_eq!(conv.rows, rows);
       assert_eq!(conv.cols, cols);
       assert_eq!(conv.kernels.dim(), (num_kernels, rows, cols));
-      assert!(conv.image.is_none());
     }
 
     #[test]
@@ -233,9 +254,12 @@ mod tests {
     {
       let mut conv = Convolution::init(3, 2, 2);
       let image = array![[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]];
-      let result = conv.forward_propagation(&image);
+      let mut ctx = ConvolutionContext::new(0.01);
+      let result = conv.forward_propagation(&image, &mut ctx);
 
       assert_eq!(result.shape(), &[2, 2, 3]);
+      assert!(ctx.input.is_some());
+      assert_eq!(ctx.input.unwrap(), image);
     }
 
     #[test]
@@ -243,8 +267,9 @@ mod tests {
     test_forward_propagation_values () 
     {
       let image = array![[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]];
-      let mut conv = Convolution::init_for_test(3, 2, 2, image.clone());      
-      let result = conv.forward_propagation(&image);
+      let mut conv = Convolution::init_for_test(3, 2, 2);
+      let mut ctx = ConvolutionContext::new(0.01);
+      let result = conv.forward_propagation(&image, &mut ctx);
 
       let expected = array![
         [[12.0, 12.0, 12.0], [16.0, 16.0, 16.0]], 
@@ -265,14 +290,16 @@ mod tests {
       let image = array![[0.5, 1.0, 1.5],
         [0.7, 1.2, 1.1],
         [0.9, 1.3, 1.4]];
-      let mut conv = Convolution::init_for_test(3, 2, 2, image);
+      let mut conv = Convolution::init_for_test(3, 2, 2);
+      let mut ctx = ConvolutionContext::new(0.01);
 
       let dE_dY: Array3<f64>  = Array3::from_elem((3, 3, 3), 1.0);
       
       // Store a copy of the original kernels to compare with after the update
       let original_kernels = conv.kernels.clone();
 
-      conv.back_propagation(&dE_dY, 0.01);
+      conv.forward_propagation(&image, &mut ctx);
+      conv.back_propagation(&dE_dY, &ctx);
 
       // The kernels should have changed after calling back_propagation
       assert_ne!(original_kernels, conv.kernels);
@@ -285,14 +312,16 @@ mod tests {
       let image = array![[0.5, 1.0, 1.5],
         [0.7, 1.2, 1.1],
         [0.9, 1.3, 1.4]];
-      let mut conv = Convolution::init_for_test(3, 2, 2, image);
+      let mut conv = Convolution::init_for_test(3, 2, 2);
+      let mut ctx = ConvolutionContext::new(0.00);
 
       let dE_dY: Array3<f64>  = Array3::from_elem((3, 3, 3), 1.0);
       
       let original_kernels = conv.kernels.clone();
 
       // When alpha is 0, the kernels should not change
-      conv.back_propagation(&dE_dY, 0.0);
+      conv.forward_propagation(&image, &mut ctx);
+      conv.back_propagation(&dE_dY, &ctx);
 
       assert_eq!(original_kernels, conv.kernels);
     }
@@ -304,11 +333,13 @@ mod tests {
       let image = array![[0.5, 1.0, 1.5],
         [0.7, 1.2, 1.1],
         [0.9, 1.3, 1.4]];
-      let mut conv = Convolution::init_for_test(3, 2, 2, image);
+      let mut conv = Convolution::init_for_test(3, 2, 2);
+      let mut ctx = ConvolutionContext::new(0.01);
 
       let dE_dY: Array3<f64> = Array3::from_elem((3, 3, 3), 1.0);
       
-      let result = conv.back_propagation(&dE_dY.clone(), 0.01);
+      conv.forward_propagation(&image, &mut ctx);
+      let result = conv.back_propagation(&dE_dY.clone(), &ctx);
       let expected = array!
         [
           [[3.4, 4.8], [4.1, 5.0]], 

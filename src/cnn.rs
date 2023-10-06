@@ -40,12 +40,25 @@ train (
 {
   let a: Array2<f64> = image.mapv(|x| x as f64 / 255.0);
 
-  let dist: Array1<f64> = 
-    s.forward_propagation(
-      &p.forward_propagation(
-        &c.forward_propagation(&a)
-      )
-    );
+  let mut c_ctx = ConvolutionContext::new(hyper_params.learning_rate);
+  let mut p_ctx = PoolingContext::new();
+  let mut s_ctx = SoftmaxContext::new(hyper_params.learning_rate);
+
+  let c_results = c.forward_propagation(&a, &mut c_ctx);
+  let p_results = p.forward_propagation(&c_results, &mut p_ctx);
+  let dist = s.forward_propagation(&p_results, &mut s_ctx);
+
+  // let dist: Array1<f64> =   
+  //   s.forward_propagation(
+  //     &p.forward_propagation(
+  //       &c.forward_propagation(
+  //         &a,
+  //         &mut c_ctx
+  //       ),
+  //       &mut p_ctx
+  //     ),
+  //     &mut s_ctx
+  //   );
 
   let loss = cross_entropy(dist[label as usize]);
   let accuracy = if argmax(&dist) == label as usize {
@@ -59,9 +72,13 @@ train (
 
   c.back_propagation(
     &p.back_propagation(
-      &s.back_propagation(&gradient, hyper_params.learning_rate)
+      &s.back_propagation(
+        &gradient, 
+        &s_ctx
+      ),
+      &p_ctx
     ),
-    hyper_params.learning_rate
+    &c_ctx
   );
 
   (accuracy, loss)
