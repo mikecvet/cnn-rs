@@ -3,17 +3,14 @@ use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::{Standard, Uniform};
 use rand::prelude::*;
 
-use ndarray::{Array2, Array3};
+use ndarray::Array3;
 
-use crate::approx;
 pub use crate::approx::*;
 pub use crate::patch::*;
 
 pub struct Pooling {
   kernel_rows: usize,
-  kernel_cols: usize,
-  num_kernels: usize
-  //image: Option<Array3<f64>>
+  kernel_cols: usize
 }
 
 pub struct PoolingContext<'a> {
@@ -34,14 +31,11 @@ impl Pooling {
   pub fn 
   new (
     kernel_rows: usize,
-    kernel_cols: usize,
-    num_kernels: usize) -> Self
+    kernel_cols: usize) -> Self
   {
     Pooling { 
       kernel_rows: kernel_rows,
-      kernel_cols: kernel_cols,
-      num_kernels: num_kernels
-      //image: None
+      kernel_cols: kernel_cols
     }
   }
 
@@ -146,7 +140,7 @@ mod tests {
     let image_height = 6;
     let kernel_dim = 2;
     let image = Array3::<f64>::zeros((image_height, image_width, 3));
-    let pooling = Pooling::new(kernel_dim, kernel_dim, 3);
+    let pooling = Pooling::new(kernel_dim, kernel_dim);
     let patches = pooling.patches(&image);
 
     // Should create 9 patches as the image size is 5x5
@@ -162,7 +156,7 @@ mod tests {
   test_patches_size () 
   {
     let image = Array3::<f64>::zeros((6, 6, 3));
-    let pooling = Pooling::new(2, 2, 3);
+    let pooling = Pooling::new(2, 2);
     let patches = pooling.patches(&image);
 
     // Should create patches of size 2x2x3
@@ -176,7 +170,7 @@ mod tests {
   test_patches_indices () 
   {
     let image = Array3::<f64>::zeros((6, 6, 3));
-    let pooling = Pooling::new(2, 2, 3);
+    let pooling = Pooling::new(2, 2);
     let patches = pooling.patches(&image);
 
     // Check whether patches have correct x and y
@@ -199,7 +193,7 @@ mod tests {
   test_patches_data () 
   {
     let image = Array3::<f64>::from_shape_vec((6, 6, 3), (0..108).map(|x| x as f64).collect()).unwrap();
-    let pooling = Pooling::new(2, 2, 3);
+    let pooling = Pooling::new(2, 2);
     let patches = pooling.patches(&image);
 
     assert_eq!(
@@ -219,7 +213,7 @@ mod tests {
   test_forward_propagation_output_shape () 
   {
     let image = Array3::<f64>::zeros((26, 26, 16));
-    let mut pooling = Pooling::new(2, 2, 2);
+    let mut pooling = Pooling::new(2, 2);
     let mut ctx = PoolingContext::new();
 
     let result = pooling.forward_propagation(&image, &mut ctx);
@@ -237,16 +231,14 @@ mod tests {
         (0..108).map(|x| x as f64).collect()
     ).unwrap();
 
-    let mut pooling = Pooling::new(2, 2, 3);
+    let mut pooling = Pooling::new(2, 2);
     let mut ctx = PoolingContext::new();
 
     let result = pooling.forward_propagation(&image, &mut ctx);
 
-    // Manually verify and compare some values from the result.
-    // You might want to check more values or use different input data for thorough testing
-    // assert_approx_eq!(result[[0, 0, 0]], 21.0, 1e-6);
-    // assert_approx_eq!(result[[1, 1, 1]], 75.0, 1e-6);
-    // assert_approx_eq!(result[[2, 2, 2]], 129.0, 1e-6);
+    assert!(approx_equal(result[[0, 0, 0]], 21.0, 1e-6));
+    assert!(approx_equal(result[[1, 1, 1]], 64.0, 1e-6));
+    assert!(approx_equal(result[[2, 2, 2]], 107.0, 1e-6));
   }
 
   #[test]
@@ -254,7 +246,7 @@ mod tests {
   test_back_propagation_output_shape () 
   {
     let image = Array3::<f64>::zeros((26, 26, 16));
-    let mut pooling = Pooling::new(2, 2, 2);
+    let mut pooling = Pooling::new(2, 2);
     let mut ctx = PoolingContext::new();
 
     let dE_dY = Array3::<f64>::zeros((26, 26, 16));

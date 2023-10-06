@@ -8,19 +8,20 @@ use rand::prelude::*;
 use ndarray::{Array2, Array3};
 
 pub use crate::approx::*;
+use crate::patch;
 pub use crate::patch::Patch;
 
 pub struct Convolution {
   num_kernels: usize,
   rows: usize,
   cols: usize,
-  pub kernels: Array3<f64>
-  //image: Option<Array2<f64>>
+  kernels: Array3<f64>
 }
 
 pub struct ConvolutionContext<'a> {
   alpha: f64,
-  input: Option<&'a Array2<f64>>
+  input: Option<&'a Array2<f64>>,
+  patches: Option<Vec<Patch>>
 }
 
 impl<'a> ConvolutionContext<'a> {
@@ -29,7 +30,8 @@ impl<'a> ConvolutionContext<'a> {
   {
     ConvolutionContext { 
       alpha: alpha, 
-      input: None
+      input: None,
+      patches: None
     }
   }
 }
@@ -51,7 +53,6 @@ impl Convolution {
       rows: rows, 
       cols: cols, 
       kernels: kernels
-      //image: None
     }
   }
 
@@ -70,7 +71,6 @@ impl Convolution {
       rows: rows, 
       cols: cols, 
       kernels: kernels
-      //image: Some(image)
     }
   }
 
@@ -78,8 +78,6 @@ impl Convolution {
   patches (&mut self, image: &Array2<f64>) -> Vec<Patch>
   {
     let mut data: Vec<Patch> = Vec::new();
-
-    //self.image = Some(image.clone());
 
     for x in 0..(image.shape()[0] - self.rows + 1) {
       for y in 0..(image.shape()[1] - self.cols + 1) {
@@ -111,13 +109,17 @@ impl Convolution {
       self.num_kernels
     ));
 
-    for p in self.patches(image).iter() {
+    let patches = self.patches(image);
+
+    for p in patches.iter() {
       let m: Array1<f64> = self.kernels.axis_iter(Axis(0))
           .map(|kernel| (p.data.clone() * kernel).sum())
           .collect();
 
       a.slice_mut(s![p.x, p.y, ..]).assign(&m);
     }
+
+    ctx.patches = Some(patches);
 
     a
   }
@@ -127,9 +129,7 @@ impl Convolution {
   { 
     let mut dE_dk: Array3<f64> = Array3::zeros([self.kernels.shape()[0], self.rows, self.cols]);
 
-    for p in self.patches(
-      &ctx.input.unwrap()
-    ) {
+    for p in ctx.patches.as_ref().unwrap() {
       for k in 0..self.num_kernels {
         dE_dk.slice_mut(s![k, .., ..]).scaled_add(dE_dY[[p.x, p.y, k]], &p.data);
       }
@@ -192,9 +192,7 @@ mod tests {
               assert_ne!(
                   conv.kernels.slice(s![i, .., ..]),
                   conv.kernels.slice(s![j, .., ..]),
-                  "Kernels {} and {} are equal, which is unexpected!",
-                  i,
-                  j
+                  "Kernels {} and {} are equal, which is unexpected!", i, j
               );
           }
       }

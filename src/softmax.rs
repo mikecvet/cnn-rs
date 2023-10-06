@@ -1,6 +1,6 @@
 use std::ops::{Add, Mul, Sub};
 
-use ndarray::{Array1, Array2, Array3, Axis, Ix3};
+use ndarray::{Array1, Array2, Array3, Axis};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::num_traits::Pow;
 use ndarray_rand::rand_distr::{Uniform, Normal};
@@ -13,9 +13,6 @@ pub struct Softmax
 {
   pub weights: Array2<f64>,
   pub bias: Array1<f64>
-  //image: Option<Array3<f64>>,
-  //flattened: Option<Array1<f64>>,
-  //output: Option<Array1<f64>>
 }
 
 pub struct SoftmaxContext<'a> {

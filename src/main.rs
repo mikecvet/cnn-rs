@@ -1,11 +1,7 @@
 use clap::{arg, Command};
-use cnn_rs::cnn::train;
-use cnn_rs::softmax::TrainingData;
 use ndarray::Array2;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::fs::File;
-use std::io::Read;
 
 use cnn_rs::*;
 pub use crate::args::Args;
@@ -46,7 +42,7 @@ fn
 run (args: &Args, training_data: ImageData, labels: LabelData) 
 {
   let mut convolutional_layer = Convolution::init(16, 3, 3);
-  let mut max_pooling_layer = Pooling::new(2, 2, 2);
+  let mut max_pooling_layer = Pooling::new(2, 2);
   let mut softmax_layer = Softmax::new(13 * 13 * 16, 10);
 
   let mut timer = Timer::new();
@@ -88,7 +84,7 @@ run (args: &Args, training_data: ImageData, labels: LabelData)
         time = timer.stop();
 
         println!("{} examples, batch {}: avg loss {:.4} accuracy {:.4}% avg time {}ms", 
-          indx, BATCH_SIZE, loss / BATCH_SIZE as f64, accuracy as f64 / BATCH_SIZE as f64, time);
+          indx, BATCH_SIZE, loss / BATCH_SIZE as f64, 100.0 * (accuracy as f64 / BATCH_SIZE as f64), time);
 
         loss = 0.0;
         accuracy = 0;
