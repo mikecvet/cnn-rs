@@ -12,8 +12,11 @@ pub use crate::args::Args;
 pub use crate::convolution::*;
 pub use crate::input::InputData;
 pub use crate::mnist::*;
-pub use crate::softmax::*;
 pub use crate::pooling::*;
+pub use crate::softmax::*;
+pub use crate::timer::*;
+
+const BATCH_SIZE: usize = 1000;
 
 fn 
 load_data (args: &Args, input_data: &mut InputData) 
@@ -46,9 +49,13 @@ run (args: &Args, training_data: ImageData, labels: LabelData)
   let mut max_pooling_layer = Pooling::new(2, 2, 2);
   let mut softmax_layer = Softmax::new(13 * 13 * 16, 10);
 
+  let mut timer = Timer::new();
   let mut indices: Vec<usize> = (0..training_data.images.len()).collect();
 
-  for _ in 0..4 {
+  let epochs = args.hyper_params.epochs;
+
+  for i in 0..epochs {
+    println!(">> epoch {} / {}", i+1, epochs);
     indices.shuffle(&mut thread_rng());
 
     let training_data_shuffled: Vec<Array2<u8>> = indices.iter().map(|&i| training_data.images[i].clone()).collect();
@@ -57,10 +64,14 @@ run (args: &Args, training_data: ImageData, labels: LabelData)
     let mut indx = 0;
     let mut loss:f64 = 0.0;
     let mut accuracy: usize = 0;
+    let mut time:u128 = 0;
+
+    timer.start();
 
     for (image, label) in training_data_shuffled.iter().zip(labels_shuffled.iter()) {
       indx += 1;
 
+      
       let (acc, ce) = cnn::train(
         &args.hyper_params,
         &mut convolutional_layer,
@@ -73,10 +84,17 @@ run (args: &Args, training_data: ImageData, labels: LabelData)
       loss += ce;
       accuracy += acc;
 
-      if indx % 100 == 0 {
-        println!("indx {} avg loss {} accuracy {}", indx, loss / 100.0, accuracy);
+      if indx % BATCH_SIZE == 0 {
+        time = timer.stop();
+
+        println!("{} examples, batch {}: avg loss {:.4} accuracy {:.4}% avg time {}ms", 
+          indx, BATCH_SIZE, loss / BATCH_SIZE as f64, accuracy as f64 / BATCH_SIZE as f64, time);
+
         loss = 0.0;
         accuracy = 0;
+
+        timer.start();
+        // time = 0;
       }
     }
   }

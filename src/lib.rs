@@ -7,3 +7,4 @@ pub mod mnist;
 pub mod patch;
 pub mod pooling;
 pub mod softmax;
+pub mod timer;

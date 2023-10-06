@@ -3,8 +3,8 @@ use ndarray::prelude::*;
 
 pub use crate::args::*;
 pub use crate::convolution::*;
-pub use crate::softmax::*;
 pub use crate::pooling::*;
+pub use crate::softmax::*;
 
 fn 
 cross_entropy (p: f64) -> f64 
@@ -47,18 +47,6 @@ train (
   let c_results = c.forward_propagation(&a, &mut c_ctx);
   let p_results = p.forward_propagation(&c_results, &mut p_ctx);
   let dist = s.forward_propagation(&p_results, &mut s_ctx);
-
-  // let dist: Array1<f64> =   
-  //   s.forward_propagation(
-  //     &p.forward_propagation(
-  //       &c.forward_propagation(
-  //         &a,
-  //         &mut c_ctx
-  //       ),
-  //       &mut p_ctx
-  //     ),
-  //     &mut s_ctx
-  //   );
 
   let loss = cross_entropy(dist[label as usize]);
   let accuracy = if argmax(&dist) == label as usize {
