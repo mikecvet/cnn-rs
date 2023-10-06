@@ -5,10 +5,11 @@ use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::num_traits::Pow;
 use ndarray_rand::rand_distr::{Uniform, Normal};
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 
 pub use crate::approx::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Softmax
 {
   pub weights: Array2<f64>,
@@ -72,14 +73,11 @@ impl Softmax {
     Softmax {
       weights: weights,
       bias: bias
-      //image: None,
-      //flattened: None,
-      //output: None
     }
   }
 
   pub fn 
-  new_for_test (input_size: usize, output_size: usize, image: &Array3<f64>) -> Self 
+  new_for_test (input_size: usize, output_size: usize) -> Self 
   {
     let weights = Array2::ones((input_size, output_size)) / input_size as f64;
     let bias = Array1::zeros(output_size);
@@ -87,9 +85,6 @@ impl Softmax {
     Softmax {
       weights: weights,
       bias: bias
-      //image: Some(image.clone()),
-      //flattened: None,
-      //output: None
     }
   }
 
@@ -126,32 +121,18 @@ impl Softmax {
         let mut dY_dZ: Array1<f64> = -transformation_eq[indx] * transformation_eq.clone() / S_total.pow(2);
         dY_dZ[indx] = transformation_eq[indx] * (S_total - transformation_eq[indx]) / S_total.pow(2);
 
-        //println!("dy_dz shape {:?}", dY_dZ.shape());
-
         let dZ_dw = ctx.flattened.as_ref().unwrap();
-        //println!("dZ_dw shape {:?}", dZ_dw.shape());
         let dZ_db = 1.0 as f64;
         let dZ_dX = self.weights.clone();
-        //println!("dZ_dX shape {:?}", dZ_dX.shape());
-        
 
         let dE_dZ = dY_dZ * (*gradient);
 
-        //println!("dE_dZ shape {:?}", dE_dZ.shape());
-
         let dE_dw = dZ_dw.clone().insert_axis(Axis(1)).dot(&dE_dZ.clone().insert_axis(Axis(0)));
-        //println!("dE_dw shape {:?}", dE_dw.shape());
         let dE_db = dE_dZ.clone().mul(dZ_db);
-        //println!("dE_db shape {:?}", dE_db.shape());
         let dE_dX = dZ_dX.dot(&dE_dZ);
-
-        //println!("dE_dX shape {:?}", dE_dX.shape());
 
         self.weights = self.weights.clone().sub(ctx.alpha * dE_dw);
         self.bias = self.bias.clone().sub(ctx.alpha * dE_db);
-
-        // println!("de_dx shape: {:?} data {:?}", dE_dX.shape(), dE_dX);
-        // println!("image {:?}", self.image.as_ref().unwrap().shape());
 
         return reshape_to_3d(
           dE_dX.clone().into_dyn(), 
@@ -162,7 +143,6 @@ impl Softmax {
       indx += 1;
     }
 
-    //println!("returning ALL ZEROES WTF");
     Array3::zeros(ctx.input.unwrap().raw_dim())
   }
 }
@@ -222,7 +202,7 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3)); // adjust shape as necessary
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut softmax = Softmax::new_for_test(input_size, output_size);
     let mut ctx = SoftmaxContext::new(0.01);
     let result = softmax.forward_propagation(&image, &mut ctx);
 
@@ -237,7 +217,7 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut softmax = Softmax::new_for_test(input_size, output_size);
     let mut ctx = SoftmaxContext::new(0.01);
 
     let result = softmax.forward_propagation(&image, &mut ctx);
@@ -257,7 +237,7 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3)); 
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut softmax = Softmax::new_for_test(input_size, output_size);
     let mut ctx = SoftmaxContext::new(0.01);
 
     softmax.forward_propagation(&image, &mut ctx);
@@ -275,7 +255,7 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut softmax = Softmax::new_for_test(input_size, output_size);
     let mut ctx = SoftmaxContext::new(0.01);
 
     softmax.forward_propagation(&image, &mut ctx);
@@ -294,7 +274,7 @@ mod tests
     let output_size = 10;
     let image = Array3::<f64>::ones((13, 13, 16));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut softmax = Softmax::new_for_test(input_size, output_size);
     let mut ctx = SoftmaxContext::new(0.01);
     
     softmax.forward_propagation(&image, &mut ctx);
@@ -313,7 +293,7 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut softmax = Softmax::new_for_test(input_size, output_size);
     let mut ctx = SoftmaxContext::new(0.01);
 
     let original_weights = softmax.weights.clone();
@@ -335,7 +315,7 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size, &image);
+    let mut softmax = Softmax::new_for_test(input_size, output_size);
     let mut ctx = SoftmaxContext::new(0.01);
 
     let original_weights = softmax.weights.clone();
