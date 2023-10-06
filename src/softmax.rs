@@ -13,7 +13,7 @@ pub struct Softmax
 {
   pub weights: Array2<f64>,
   pub bias: Array1<f64>,
-  //image: Option<Array3<f64>>,
+  image: Option<Array3<f64>>,
   flattened: Option<Array1<f64>>,
   output: Option<Array1<f64>>
 }
@@ -84,7 +84,7 @@ impl Softmax {
   pub fn 
   forward_propagation (&mut self, image: &Array3<f64>) -> Array1<f64> 
   {
-    //self.image = Some(image.clone());
+    self.image = Some(image.clone());
 
     let flattened: Array1<f64> = image.to_owned().into_shape((image.len(),)).unwrap();
     self.flattened = Some(flattened.clone());
@@ -96,7 +96,7 @@ impl Softmax {
   }
 
   pub fn 
-  back_propagation (&mut self, &input: &Array3<f64>, dE_dY: &Array1<f64>, alpha: f64) -> Array3<f64>
+  back_propagation (&mut self, dE_dY: &Array1<f64>, alpha: f64) -> Array3<f64>
   {
     let mut indx = 0;
 
@@ -137,7 +137,7 @@ impl Softmax {
 
         return reshape_to_3d(
           dE_dX.clone().into_dyn(), 
-          input.shape()
+          self.image.as_ref().unwrap().shape()
         ).unwrap();
       }
 
@@ -145,7 +145,7 @@ impl Softmax {
     }
 
     //println!("returning ALL ZEROES WTF");
-    Array3::zeros(input.raw_dim())
+    Array3::zeros(self.image.as_ref().unwrap().raw_dim())
   }
 }
 
