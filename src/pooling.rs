@@ -8,15 +8,20 @@ pub use crate::approx::*;
 pub use crate::patch;
 pub use crate::patch::*;
 
+/// The pooling layer extracts dominant features in the image space via the 
+/// max-pooling method. This method is also effective at suppressing noise in
+/// the parts of the image covered by the earlier in the earlier layer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pooling {
   kernel_rows: usize,
   kernel_cols: usize
 }
 
+/// Caches data used during forward propagation which is necessary
+/// for backward propagation during training
 pub struct PoolingContext<'a> {
   input: Option<&'a Array3<f64>>,
-  patches: Option<Vec<Patch3>>
+  patches: Option<Vec<Patch>>
 }
 
 impl<'a> PoolingContext<'a> {
@@ -43,14 +48,14 @@ impl Pooling {
   }
 
   pub fn 
-  patches (&self, image: &Array3<f64>) -> Vec<Patch3>
+  patches (&self, image: &Array3<f64>) -> Vec<Patch>
   {
-    let mut data: Vec<Patch3> = Vec::new();
+    let mut data: Vec<Patch> = Vec::new();
 
     for x in 0..(image.shape()[0] / self.kernel_rows) {
       for y in 0..(image.shape()[1] / self.kernel_cols) {
 
-        let p = Patch3 {
+        let p = Patch {
           x: x,
           y: y,
           data: image.slice(
@@ -78,7 +83,7 @@ impl Pooling {
     let mut a: Array3<f64> = Array3::zeros((
       input.shape()[0] / self.kernel_rows, 
       input.shape()[1] / self.kernel_cols, 
-      input.shape()[2]
+      input.shape()[2] // number of kernels
     ));
 
     let patches = self.patches(input);

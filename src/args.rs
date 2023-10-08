@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 const DEFAULT_EPOCHS: usize = 3;
 const DEFAULT_LEARNING_RATE: f64 = 0.01;
 
+/// Configuration variables which manage overall model training properties
 #[derive(Clone, Serialize, Deserialize)]
 pub struct HyperParams 
 {
