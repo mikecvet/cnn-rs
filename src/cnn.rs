@@ -10,22 +10,38 @@ pub use crate::convolution::*;
 pub use crate::pooling::*;
 pub use crate::softmax::*;
 
+const OUTPUT_LAYER_SIZE: usize = 10;
+
+/// Represents a convolutional neural network. Contains three layers (convolutional,
+/// max pooling, and softmax), as well as some metadata. Can be serialized or 
+/// deserialized. Intended to work specifically with the MNIST dataset of 
+/// hand-written digits, or other images of similar dimensions.
 #[derive(Serialize, Deserialize)]
 pub struct CNN {
-  pub loaded: bool,
+  pub trained: bool,
   hyper_params: HyperParams,
   convolution_layer: Convolution,
   max_pooling_layer: Pooling,
   softmax_layer: Softmax
 }
 
+/// Returns the uncertainty inherent with the given probability as part of the
+/// probability distribution resulting from this network's output layer. Used
+/// as model loss function. When provided with the highest probability resulting
+/// from model inference, this value is lower when the probability is higher.
+/// The uncertainty of outcome is lower if its probabalistic likelihood is higher.
+/// 
+/// https://en.wikipedia.org/wiki/Entropy_(information_theory)
 fn 
-cross_entropy (p: f64) -> f64 
+entropy (p: f64) -> f64 
 {
   -p.log2()
 }
 
-fn 
+/// Returns the index of the maximal value within the given
+/// array. Used to find the most likely outcome given 
+/// a probability distribution resulting from model inference.
+fn
 argmax (x: &Array1<f64>) -> usize 
 {
   let (index, _) = x.iter().enumerate().fold(
@@ -47,11 +63,11 @@ impl CNN
   new (hyper_params: HyperParams) -> Self
   {
     CNN { 
-      loaded: false,
+      trained: false,
       hyper_params: hyper_params,
       convolution_layer: Convolution::init(16, 3, 3), 
       max_pooling_layer: Pooling::new(2, 2), 
-      softmax_layer: Softmax::new(13 * 13 * 16, 10) 
+      softmax_layer: Softmax::new(13 * 13 * 16, OUTPUT_LAYER_SIZE) 
     }
   }
 
@@ -84,13 +100,15 @@ impl CNN
     self.convolution_layer = deserialized_cnn.convolution_layer;
     self.max_pooling_layer = deserialized_cnn.max_pooling_layer;
     self.softmax_layer = deserialized_cnn.softmax_layer;
-    self.loaded = true;
+    self.trained = true;
 
     println!("loaded model data from {}", path);
     
     Ok(())
   }
 
+  /// Predicts the most likely label / digit contained within the given image data. Executes
+  /// feedforward functions within this neural network's layers.
   pub fn 
   predict (&mut self, image: &Array2<u8>) -> usize
   {
@@ -112,6 +130,8 @@ impl CNN
     argmax(&dist)
   }
 
+  /// Runs a training iteration on this network given an image and label. Executes forward and
+  /// backpropagation through each layer.
   pub fn 
   train (&mut self, image: &Array2<u8>, label: u8) -> (usize, f64)
   {
@@ -131,7 +151,7 @@ impl CNN
 
     // Cross-entropy loss calculation of the computed probability of this outcome versus
     // the provided label of the image
-    let loss = cross_entropy(dist[label as usize]);
+    let loss = entropy(dist[label as usize]);
 
     // Helps tabulate precision numbers of the feed-forward inference; basically
     // counting how many times the prediction of the image value was corrects
@@ -141,9 +161,12 @@ impl CNN
       0
     };
 
-    let mut gradient: Array1<f64> = Array1::zeros(10);
+    // Build gradient given probability distribution and most likely label
+    // resulting from prediction step
+    let mut gradient: Array1<f64> = Array1::zeros(OUTPUT_LAYER_SIZE);
     gradient[label as usize] = -1.0/dist[label as usize];
 
+    // Update layers based on gradient
     self.convolution_layer.back_propagation(
       &self.max_pooling_layer.back_propagation(
         &self.softmax_layer.back_propagation(

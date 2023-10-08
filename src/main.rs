@@ -16,6 +16,8 @@ pub use crate::timer::*;
 
 const BATCH_SIZE: usize = 1000;
 
+/// Loads any of the training image, test image, training label or test label 
+/// files into the corresponding fields of the given `InputData` struct
 fn 
 load_data (args: &Args, input_data: &mut InputData) 
 {
@@ -40,6 +42,8 @@ load_data (args: &Args, input_data: &mut InputData)
   };
 }
 
+/// Loads model data from disk, if a valid path to a model data file exists. Trains the model for the
+/// specified number of iterations, if training images and labels are present.
 fn 
 load_and_train (cnn: &mut CNN, args: &Args, training_data: ImageData, labels: LabelData)
 {
@@ -47,11 +51,13 @@ load_and_train (cnn: &mut CNN, args: &Args, training_data: ImageData, labels: La
   let mut timer = Timer::new();
   let mut indices: Vec<usize> = (0..training_data.images.len()).collect();
 
+  // Load model data
   match args.load.as_ref() {
     Some(path) => cnn.load_from_file(&path).unwrap(),
     _ => ()
   }
 
+  // Train for `epochs` iterations over training images and labels, if they're present
   if !training_data.images.is_empty() && !labels.labels.is_empty() {
     for i in 0..epochs {
       println!(">> epoch {} / {}", i+1, epochs);
@@ -90,28 +96,38 @@ load_and_train (cnn: &mut CNN, args: &Args, training_data: ImageData, labels: La
           timer.start();
         }
       }
+
+      cnn.trained = true;
+    }
+
+    // Save results
+    if args.save {
+      // Any errors saving are printed within this function
+      cnn.save_to_file("cnn.model").unwrap();
     }
   }
 
-  if args.save {
-    cnn.save_to_file("cnn.model");
-  }
+  let s1 = format!("{}.jpg", labels.labels[0]);
+  let s2 = format!("{}.jpg", labels.labels[1]);
+  let s3 = format!("{}.jpg", labels.labels[2]);
 
-  write_image("1.jpg", &training_data.images[0]);
-  write_image("2.jpg", &training_data.images[1]);
-  write_image("3.jpg", &training_data.images[2]);
-
-  //println!("labels: {:?}", labels.labels);
+  write_image(&s1, &training_data.images[0]);
+  write_image(&s2, &training_data.images[1]);
+  write_image(&s3, &training_data.images[2]);
 }
 
+/// Loads model data from the provided path, if the model has not yet been already loaded
+/// from disk or trained. Runs prediction with the given `CNN` against the provided
+/// `ImageData` and compares against given `LabelData`. Outputs prediction accracy.
 fn 
 load_and_test (cnn: &mut CNN, args: &Args, image_data: &ImageData, label_data: &LabelData) 
 {
   match args.load.as_ref() {
-    Some(path) if !cnn.loaded => cnn.load_from_file(&path).unwrap(),
+    Some(path) if !cnn.trained => cnn.load_from_file(&path).unwrap(),
     _ => ()
   }
 
+  println!("predicting digits for {} images", image_data.images.len());
   let mut count = 0;
 
   for (image, label) in image_data.images.iter().zip(label_data.labels.iter()) {
@@ -130,7 +146,7 @@ write_image (path: &str, image: &Array2<u8>)
 {
   let pixels: Vec<u8> = image.iter().cloned().collect();
 
-  println!("pixels len {}, image shape {:?}, image: {:?}", pixels.len(), image.shape(), image);
+  //println!("pixels len {}, image shape {:?}, image: {:?}", pixels.len(), image.shape(), image);
 
   // Convert the Vec<u8> to an ImageBuffer
   let img = ImageBuffer::<Luma<u8>, _>::from_raw(28, 28, pixels).unwrap();
@@ -143,9 +159,9 @@ write_image (path: &str, image: &Array2<u8>)
 fn 
 main () 
 {
-  let matches = Command::new("word2vec-rs")
+  let matches = Command::new("cnn-rs")
   .version("0.1")
-  .about("Simple word2vec implementation in rust")
+  .about("A convolutional neural network implementation in rust")
   .arg(arg!(--training_images <VALUE>)
     .required(false)
     .value_name("path")
@@ -205,6 +221,7 @@ main ()
 
   load_data(&args, &mut input_data);
 
+  // If training images are present, train the model
   match (input_data.training_images, input_data.training_labels) {
     (Some(images_bytes), Some(labels_bytes)) => {
       let training_image_data = ImageData::init(&images_bytes);
@@ -215,6 +232,7 @@ main ()
     (_, _) => ()
   }
 
+  // If test images are present, test the model
   match (input_data.test_images, input_data.test_labels) {
     (Some(images_bytes), Some(labels_bytes)) => {
       let test_image_data = ImageData::init(&images_bytes);
