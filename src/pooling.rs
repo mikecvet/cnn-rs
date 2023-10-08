@@ -1,20 +1,22 @@
-use ndarray::{s, Array1, Axis};
+use ndarray::{s, Array1, Array3, Axis};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::{Standard, Uniform};
 use rand::prelude::*;
-
-use ndarray::Array3;
+use serde::{Deserialize, Serialize};
 
 pub use crate::approx::*;
+pub use crate::patch;
 pub use crate::patch::*;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pooling {
   kernel_rows: usize,
   kernel_cols: usize
 }
 
 pub struct PoolingContext<'a> {
-  input: Option<&'a Array3<f64>>
+  input: Option<&'a Array3<f64>>,
+  patches: Option<Vec<Patch3>>
 }
 
 impl<'a> PoolingContext<'a> {
@@ -22,7 +24,8 @@ impl<'a> PoolingContext<'a> {
   new () -> Self
   {
     PoolingContext { 
-      input: None 
+      input: None,
+      patches: None
     }
   }
 }
@@ -72,16 +75,15 @@ impl Pooling {
     ctx: &mut PoolingContext<'a>
   ) -> Array3<f64>
   {
-    //self.image = Some(image.clone());
-    ctx.input = Some(input);
-
     let mut a: Array3<f64> = Array3::zeros((
       input.shape()[0] / self.kernel_rows, 
       input.shape()[1] / self.kernel_cols, 
       input.shape()[2]
     ));
 
-    for p in self.patches(input).iter() {
+    let patches = self.patches(input);
+
+    for p in patches.iter() {
       let depth = p.data.dim().2;
       let v: Vec<f64> = (0..depth).map(|i| {
         p.data.slice(s![.., .., i])
@@ -91,16 +93,18 @@ impl Pooling {
       a.slice_mut(s![p.x, p.y, ..]).assign(&Array1::from(v));
     }
 
+    ctx.input = Some(input);
+    ctx.patches = Some(patches);
+
     a
   }
 
   pub fn 
-  back_propagation (&self, dE_dY: &Array3<f64>, ctx: &PoolingContext) -> Array3<f64>
+  back_propagation (&self, input: &Array3<f64>, ctx: &PoolingContext) -> Array3<f64>
   {
-    let mut dE_dk: Array3<f64> = Array3::zeros(ctx.input.unwrap().raw_dim());
+    let mut output: Array3<f64> = Array3::zeros(ctx.input.unwrap().raw_dim());
 
-    // lazy state?
-    for p in self.patches(&ctx.input.unwrap()) {
+    for p in ctx.patches.as_ref().unwrap() {
       let width = p.data.shape()[0];
       let height = p.data.shape()[1];
       let num_kernels = p.data.shape()[2];
@@ -113,18 +117,18 @@ impl Pooling {
         for j in 0..width {
           for k in 0..num_kernels {
             if approx_equal(p.data[[i, j, k]], max_values[k], EPSILON) {
-              dE_dk[[
+              output[[
                 p.x * self.kernel_rows + i, 
                 p.y * self.kernel_cols + j, 
                 k
-              ]] = dE_dY[[p.x, p.y, k]]
+              ]] = input[[p.x, p.y, k]]
             }
           }
         }
       }
     }
 
-    dE_dk
+    output
   }
 }
 

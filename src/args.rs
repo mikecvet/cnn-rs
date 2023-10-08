@@ -1,6 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 const DEFAULT_EPOCHS: usize = 3;
 const DEFAULT_LEARNING_RATE: f64 = 0.01;
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct HyperParams 
 {
   pub epochs: usize,
@@ -13,6 +16,8 @@ pub struct Args
   pub training_labels_path: Option<String>,
   pub test_image_path: Option<String>,
   pub test_labels_path: Option<String>,
+  pub save: bool,
+  pub load: Option<String>,
   pub hyper_params: HyperParams
 }
 
@@ -51,16 +56,19 @@ impl Args
     training_lables_path: Option<String>,
     test_image_path: Option<String>,
     test_lables_path: Option<String>,
+    save_opt: Option<bool>,
+    load_opt: Option<String>,
     epochs_opt: Option<String>,
     learning_rate_opt: Option<String>
   ) -> Self 
   {
-
      Args { 
       training_image_path: training_image_path, 
       training_labels_path: training_lables_path,
       test_image_path: test_image_path, 
       test_labels_path: test_lables_path,
+      save: save_opt.unwrap_or(true),
+      load: load_opt,
       hyper_params: HyperParams::new(epochs_opt, learning_rate_opt)
     } 
   }

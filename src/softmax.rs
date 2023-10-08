@@ -63,6 +63,7 @@ impl Softmax {
     let mut weights = Array2::zeros((input_size, output_size)) / input_size as f64;
     let bias = Array1::zeros(output_size);
 
+    // He weights initialization
     let std = (2.0 / weights.len() as f64).sqrt();
     let distribution = Normal::new(0.0, std).expect("Failed to create distribution");
 
@@ -91,18 +92,13 @@ impl Softmax {
   pub fn 
   forward_propagation<'a> (&mut self, input: &'a Array3<f64>, ctx: &mut SoftmaxContext<'a>) -> Array1<f64> 
   {
-    //self.image = Some(input.clone());
-
     let flattened: Array1<f64> = input.to_owned().into_shape((input.len(),)).unwrap();
-    //self.flattened = Some(flattened.clone());
-
-    let x = flattened.dot(&self.weights).add(&self.bias);
-    //self.output = Some(x.clone());
-    let probabilities = softmax(&x);
+    let dot_result = flattened.dot(&self.weights).add(&self.bias);
+    let probabilities = softmax(&dot_result);
 
     ctx.input = Some(input);
     ctx.flattened = Some(flattened);
-    ctx.dot_result = Some(x);
+    ctx.dot_result = Some(dot_result);
     ctx.output = Some(probabilities.clone());
 
     probabilities
@@ -134,10 +130,10 @@ impl Softmax {
         self.weights = self.weights.clone().sub(ctx.alpha * dE_dw);
         self.bias = self.bias.clone().sub(ctx.alpha * dE_db);
 
-        return reshape_to_3d(
-          dE_dX.clone().into_dyn(), 
-          ctx.input.unwrap().shape()
-        ).unwrap();
+        // Force the matrix into a 3D shape; kind of awkward APIs
+        return dE_dX
+        .into_shape(ctx.input.unwrap().shape()).unwrap()
+        .into_dimensionality().unwrap();
       }
 
       indx += 1;
@@ -145,16 +141,6 @@ impl Softmax {
 
     Array3::zeros(ctx.input.unwrap().raw_dim())
   }
-}
-
-fn 
-reshape_to_3d (arr: ndarray::ArrayD<f64>, new_shape: &[usize]) -> Result<Array3<f64>, ndarray::ShapeError> 
-{
-  // Reshape the array
-  let reshaped_arr = arr.into_shape(new_shape)?;
-  // Convert dynamic-dimensional array to 3D array
-  let array3 = reshaped_arr.into_dimensionality()?;
-  Ok(array3)
 }
 
 #[cfg(test)]
