@@ -18,7 +18,6 @@ const OUTPUT_LAYER_SIZE: usize = 10;
 /// hand-written digits, or other images of similar dimensions.
 #[derive(Serialize, Deserialize)]
 pub struct CNN {
-  pub trained: bool,
   hyper_params: HyperParams,
   convolution_layer: Convolution,
   max_pooling_layer: Pooling,
@@ -63,7 +62,6 @@ impl CNN
   new (hyper_params: HyperParams) -> Self
   {
     CNN { 
-      trained: false,
       hyper_params: hyper_params,
       convolution_layer: Convolution::init(16, 3, 3), 
       max_pooling_layer: Pooling::new(2, 2), 
@@ -100,7 +98,6 @@ impl CNN
     self.convolution_layer = deserialized_cnn.convolution_layer;
     self.max_pooling_layer = deserialized_cnn.max_pooling_layer;
     self.softmax_layer = deserialized_cnn.softmax_layer;
-    self.trained = true;
 
     println!("loaded model data from {}", path);
     

@@ -19,6 +19,7 @@ pub struct Args
   pub test_labels_path: Option<String>,
   pub save: bool,
   pub load: Option<String>,
+  pub input_dir: Option<String>,
   pub hyper_params: HyperParams
 }
 
@@ -59,6 +60,7 @@ impl Args
     test_lables_path: Option<String>,
     save_opt: Option<bool>,
     load_opt: Option<String>,
+    input_dir_opt: Option<String>,
     epochs_opt: Option<String>,
     learning_rate_opt: Option<String>
   ) -> Self 
@@ -70,6 +72,7 @@ impl Args
       test_labels_path: test_lables_path,
       save: save_opt.unwrap_or(true),
       load: load_opt,
+      input_dir: input_dir_opt,
       hyper_params: HyperParams::new(epochs_opt, learning_rate_opt)
     } 
   }

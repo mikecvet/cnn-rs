@@ -47,6 +47,8 @@ impl Pooling {
     }
   }
 
+  /// A patch is a concept from image processing which captures subregions of the image pixels, 
+  /// used to capture groups of spatial features from the underlying image.
   pub fn 
   patches (&self, image: &Array3<f64>) -> Vec<Patch>
   {
@@ -73,6 +75,8 @@ impl Pooling {
     data
   }
 
+  /// Runs forward propagation in this layer of the network. Generates patches over the input, 
+  /// multiplies each patch against the set of kernels and returns the results.
   pub fn 
   forward_propagation<'a> (
     &mut self, 

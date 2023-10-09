@@ -1,8 +1,11 @@
 use clap::{arg, Command};
-use image::{ImageBuffer, Luma};
+use image::{open, ImageBuffer, Luma};
 use ndarray::Array2;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use std::fs::File;
+use std::path::Path;
+use walkdir::WalkDir;
 
 use cnn_rs::*;
 pub use crate::args::Args;
@@ -51,12 +54,6 @@ load_and_train (cnn: &mut CNN, args: &Args, training_data: ImageData, labels: La
   let mut timer = Timer::new();
   let mut indices: Vec<usize> = (0..training_data.images.len()).collect();
 
-  // Load model data
-  match args.load.as_ref() {
-    Some(path) => cnn.load_from_file(&path).unwrap(),
-    _ => ()
-  }
-
   // Train for `epochs` iterations over training images and labels, if they're present
   if !training_data.images.is_empty() && !labels.labels.is_empty() {
     for i in 0..epochs {
@@ -96,8 +93,6 @@ load_and_train (cnn: &mut CNN, args: &Args, training_data: ImageData, labels: La
           timer.start();
         }
       }
-
-      cnn.trained = true;
     }
 
     // Save results
@@ -122,11 +117,6 @@ load_and_train (cnn: &mut CNN, args: &Args, training_data: ImageData, labels: La
 fn 
 load_and_test (cnn: &mut CNN, args: &Args, image_data: &ImageData, label_data: &LabelData) 
 {
-  match args.load.as_ref() {
-    Some(path) if !cnn.trained => cnn.load_from_file(&path).unwrap(),
-    _ => ()
-  }
-
   println!("predicting digits for {} images", image_data.images.len());
   let mut count = 0;
 
@@ -154,6 +144,40 @@ write_image (path: &str, image: &Array2<u8>)
   // Save the ImageBuffer as a JPEG file
   img.save(path).unwrap(); 
   println!("wrote image {}", path);
+}
+
+/// Given a directory path, loads all jpeg files as greyscale, converts them to
+/// ndarray::Array2<u8>, and returns a vector of name, vector pairs
+fn 
+load_images (dir_path: &str) -> Result<Vec<(String, Array2<u8>)>, Box<dyn std::error::Error>> 
+{
+  let mut image_pairs: Vec<(String, Array2<u8>)> = Vec::new();
+
+  // Iterate over each entry in the directory
+  for entry in WalkDir::new(dir_path) {
+    let entry = entry?;
+    let path = entry.path();
+
+    // Check if the entry is a file and has a .jpg extension
+    if path.is_file() && path.extension().unwrap().eq(std::ffi::OsStr::new("jpeg")) {
+      let img = open(path)?;
+
+      // Convert the image to grayscale
+      let gray_img = img.to_luma8();
+
+      // Convert the grayscale image to Array2<u8>
+      let a = Array2::from_shape_vec(
+        (gray_img.height() as usize, 
+         gray_img.width() as usize),
+         gray_img.into_raw(),
+        )?;
+
+      // Add the ndarray to the images Vec
+      image_pairs.push((path.file_name().unwrap().to_str().unwrap().to_string(), a));
+    }
+  }
+
+  Ok(image_pairs)
 }
 
 fn 
@@ -193,7 +217,11 @@ main ()
   .arg(arg!(--load <VALUE>)
     .required(false)
     .value_name("FILE_PATH")
-    .help("path to a previously-written file containing model data"))  
+    .help("path to a previously-written file containing model data"))
+  .arg(arg!(--input_dir <VALUE>)
+    .required(false)
+    .value_name("FILE_PATH")
+    .help("path to a directory containing 28x28 px jpeg files"))  
   .get_matches();
 
   let training_image_path_opt = matches.get_one::<String>("training_images").cloned();
@@ -204,6 +232,7 @@ main ()
   let learning_rate_opt = matches.get_one::<String>("learning_rate").cloned();
   let load_opt = matches.get_one::<String>("load").cloned();
   let save_opt = matches.get_one::<bool>("save").cloned();
+  let input_dir_opt = matches.get_one::<String>("input_dir").cloned();
 
   let args = Args::new( 
       training_image_path_opt,
@@ -212,13 +241,21 @@ main ()
       test_labels_path_opt,
       save_opt,
       load_opt,
+      input_dir_opt,
       epochs_opt,
       learning_rate_opt
   );
 
-  let mut input_data = InputData::default();
+  // Initializes the new CNN; if loading argument is present, reads
+  // previously-serialized neural network data from path in arguments
   let mut cnn = cnn::CNN::new(args.hyper_params.clone());
+  match args.load.as_ref() {
+    Some(path) => cnn.load_from_file(&path).unwrap(),
+    _ => ()
+  }
 
+  // Loads raw training and test images and labels, if any are specified
+  let mut input_data = InputData::default();
   load_data(&args, &mut input_data);
 
   // If training images are present, train the model
@@ -241,5 +278,25 @@ main ()
       load_and_test(&mut cnn, &args, &test_image_data, &test_label_data)
     }
     (_, _) => ()
+  }
+
+  // If a custom input directory is provided in arguments, read the image contents,
+  // infer their digits, and report the predicted numbers.
+  match args.input_dir {
+    Some(dir) => {
+      match load_images(&dir) {
+        Ok(image_pairs) => {
+          for (file_name, image) in image_pairs.iter() {
+            let digit = cnn.predict(image);
+
+            println!("predict that the digit in {} is {}", file_name, digit);
+          }
+        }
+        Err(e) => {
+          println!("error loading custom images: {}", e);
+        }
+      }
+    }
+    _ => ()
   }
 }
