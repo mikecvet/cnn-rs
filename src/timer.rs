@@ -1,5 +1,7 @@
 use std::time::SystemTime;
 
+/// Simple stateful timer implementation; call `start()` to begin
+/// and `stop()` when completed, which returns duration time in millis
 pub struct Timer 
 {
   t: SystemTime,

@@ -111,34 +111,31 @@ impl Softmax {
   /// Runs backward propagation in this layer of the network. Computes and returns the gradient of the loss
   /// based on weights, bias, and input from earlier layers.
   pub fn 
-  back_propagation (&mut self, dE_dY: &Array1<f64>, ctx: &SoftmaxContext) -> Array3<f64>
+  back_propagation (&mut self, input: &Array1<f64>, ctx: &SoftmaxContext) -> Array3<f64>
   {
     let mut indx = 0;
 
-    for gradient in dE_dY {
-
+    for gradient in input {
       if (*gradient) != 0.0 {
         let exp_vector = ctx.dot_result.as_ref().unwrap().mapv(f64::exp);
-        let sum_exp = exp_vector.sum();
+        let exp_sum = exp_vector.sum();
 
-        let mut dY_dZ: Array1<f64> = -exp_vector[indx] * exp_vector.clone() / sum_exp.pow(2);
-        dY_dZ[indx] = exp_vector[indx] * (sum_exp - exp_vector[indx]) / sum_exp.pow(2);
+        let mut x: Array1<f64> = -exp_vector[indx] * exp_vector.clone() / exp_sum.pow(2);
+        x[indx] = exp_vector[indx] * (exp_sum - exp_vector[indx]) / exp_sum.pow(2);
 
-        let dZ_dw = ctx.flattened.as_ref().unwrap();
-        let dZ_db = 1.0 as f64;
-        let dZ_dX = self.weights.clone();
+        let y = x * (*gradient);
+        let z = ctx.flattened.as_ref().unwrap()
+          .clone().insert_axis(Axis(1))
+          .dot(&y.clone().insert_axis(Axis(0)));
 
-        let dE_dZ = dY_dZ * (*gradient);
+        let w = self.weights.clone().dot(&y);
 
-        let dE_dw = dZ_dw.clone().insert_axis(Axis(1)).dot(&dE_dZ.clone().insert_axis(Axis(0)));
-        let dE_db = dE_dZ.clone().mul(dZ_db);
-        let dE_dX = dZ_dX.dot(&dE_dZ);
-
-        self.weights = self.weights.clone().sub(ctx.alpha * dE_dw);
-        self.bias = self.bias.clone().sub(ctx.alpha * dE_db);
+        // Update internal weight state
+        self.weights = self.weights.clone().sub(ctx.alpha * z);
+        self.bias = self.bias.clone().sub(ctx.alpha * y);
 
         // Force the matrix into a 3D shape; kind of awkward ndarray API
-        return dE_dX
+        return w
           .into_shape(ctx.input.unwrap().shape()).unwrap()
           .into_dimensionality().unwrap();
       }
@@ -146,6 +143,8 @@ impl Softmax {
       indx += 1;
     }
 
+    // When this happens, there were no previously-computed nonzero gradient values
+    // from earlier layers
     Array3::zeros(ctx.input.unwrap().raw_dim())
   }
 }
@@ -253,8 +252,8 @@ mod tests
 
     softmax.forward_propagation(&image, &mut ctx);
 
-    let dE_dY = Array1::ones(output_size);
-    let result = softmax.back_propagation(&dE_dY, &ctx);
+    let input = Array1::ones(output_size);
+    let result = softmax.back_propagation(&input, &ctx);
 
     assert_eq!(result.shape(), image.shape(), "Output shape of dE_dX is incorrect");
   }
@@ -272,8 +271,8 @@ mod tests
     
     softmax.forward_propagation(&image, &mut ctx);
 
-    let dE_dY = Array1::ones(output_size);
-    let result = softmax.back_propagation(&dE_dY, &ctx);
+    let input = Array1::ones(output_size);
+    let result = softmax.back_propagation(&input, &ctx);
 
     assert_eq!(result.shape(), image.shape(), "Output shape of dE_dX is incorrect");
   }
@@ -293,8 +292,8 @@ mod tests
     let original_bias = softmax.bias.clone();
     
     softmax.forward_propagation(&image, &mut ctx);
-    let dE_dY = Array1::ones(output_size);
-    softmax.back_propagation(&dE_dY, &ctx);
+    let input = Array1::ones(output_size);
+    softmax.back_propagation(&input, &ctx);
 
     assert_ne!(original_weights, softmax.weights, "Weights not modified");
     assert_ne!(original_bias, softmax.bias, "Bias not modified");
@@ -315,8 +314,8 @@ mod tests
     let original_bias = softmax.bias.clone();
     
     softmax.forward_propagation(&image, &mut ctx);
-    let dE_dY = Array1::zeros(output_size);
-    softmax.back_propagation(&dE_dY, &ctx);
+    let input = Array1::zeros(output_size);
+    softmax.back_propagation(&input, &ctx);
 
     assert_eq!(original_weights, softmax.weights, "Weights modified unexpectedly");
     assert_eq!(original_bias, softmax.bias, "Bias modified unexpectedly");
@@ -335,12 +334,10 @@ mod tests
 
     softmax.forward_propagation(&image, &mut ctx);
 
-    let mut dE_dY = Array1::zeros(output_size);
-    dE_dY[0] = 0.123;
+    let mut input = Array1::zeros(output_size);
+    input[0] = 0.123;
 
-    softmax.back_propagation(&dE_dY, &ctx);
-
-    println!("bias: {:?}", softmax.bias);
+    softmax.back_propagation(&input, &ctx);
 
     assert!(approx_equal(softmax.weights[[0, 0]], 0.08306, 1e-6));
     assert!(approx_equal(softmax.weights[[1, 1]], 0.083469, 1e-6));

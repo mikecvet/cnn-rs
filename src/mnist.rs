@@ -5,6 +5,9 @@ use serde_json::to_vec;
 use core::num;
 use std::io::Cursor;
 
+/// Data and utilities for working with the MNIST dataset of handwriten digits;
+/// see http://yann.lecun.com/exdb/mnist/ for details of the dataset and 
+/// its formatting.
 #[derive(Debug, Clone)]
 pub struct ImageData {
   pub num_images: usize,
