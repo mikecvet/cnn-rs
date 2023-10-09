@@ -101,14 +101,6 @@ load_and_train (cnn: &mut CNN, args: &Args, training_data: ImageData, labels: La
       cnn.save_to_file("cnn.model").unwrap();
     }
   }
-
-  let s1 = format!("{}.jpg", labels.labels[0]);
-  let s2 = format!("{}.jpg", labels.labels[1]);
-  let s3 = format!("{}.jpg", labels.labels[2]);
-
-  write_image(&s1, &training_data.images[0]);
-  write_image(&s2, &training_data.images[1]);
-  write_image(&s3, &training_data.images[2]);
 }
 
 /// Loads model data from the provided path, if the model has not yet been already loaded
@@ -131,19 +123,19 @@ load_and_test (cnn: &mut CNN, args: &Args, image_data: &ImageData, label_data: &
   println!("correctly predicted {} / {} digits", count, image_data.images.len());
 }
 
+/// Given a path and an matrix of bytes, converts the byte matrix into a jpeg
+/// and writes the contents to the specified path.
 fn 
 write_image (path: &str, image: &Array2<u8>) 
 {
   let pixels: Vec<u8> = image.iter().cloned().collect();
-
-  //println!("pixels len {}, image shape {:?}, image: {:?}", pixels.len(), image.shape(), image);
 
   // Convert the Vec<u8> to an ImageBuffer
   let img = ImageBuffer::<Luma<u8>, _>::from_raw(28, 28, pixels).unwrap();
 
   // Save the ImageBuffer as a JPEG file
   img.save(path).unwrap(); 
-  println!("wrote image {}", path);
+  println!("saved image {}", path);
 }
 
 /// Given a directory path, loads all jpeg files as greyscale, converts them to

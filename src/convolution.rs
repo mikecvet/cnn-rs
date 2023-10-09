@@ -36,7 +36,7 @@ pub struct ConvolutionContext<'a> {
 
 impl<'a> ConvolutionContext<'a> {
   pub fn
-  new (alpha: f64) -> Self
+  init (alpha: f64) -> Self
   {
     ConvolutionContext { 
       alpha: alpha, 
@@ -283,7 +283,7 @@ mod tests {
   {
     let mut conv = Convolution::init(3, 2, 2);
     let image = array![[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]];
-    let mut ctx = ConvolutionContext::new(0.01);
+    let mut ctx = ConvolutionContext::init(0.01);
     let result = conv.forward_propagation(&image, &mut ctx);
 
     assert_eq!(result.shape(), &[2, 2, 3]);
@@ -297,7 +297,7 @@ mod tests {
   {
     let image = array![[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]];
     let mut conv = Convolution::init_for_test(3, 2, 2);
-    let mut ctx = ConvolutionContext::new(0.01);
+    let mut ctx = ConvolutionContext::init(0.01);
     let result = conv.forward_propagation(&image, &mut ctx);
 
     let expected = array![
@@ -322,7 +322,7 @@ mod tests {
       [0.7, 1.2, 1.1],
       [0.9, 1.3, 1.4]];
     let mut conv = Convolution::init_for_test(3, 2, 2);
-    let mut ctx = ConvolutionContext::new(0.01);
+    let mut ctx = ConvolutionContext::init(0.01);
 
     let dE_dY: Array3<f64>  = Array3::from_elem((3, 3, 3), 1.0);
     
@@ -344,7 +344,7 @@ mod tests {
       [0.7, 1.2, 1.1],
       [0.9, 1.3, 1.4]];
     let mut conv = Convolution::init_for_test(3, 2, 2);
-    let mut ctx = ConvolutionContext::new(0.00);
+    let mut ctx = ConvolutionContext::init(0.00);
 
     let dE_dY: Array3<f64>  = Array3::from_elem((3, 3, 3), 1.0);
     
@@ -365,7 +365,7 @@ mod tests {
       [0.7, 1.2, 1.1],
       [0.9, 1.3, 1.4]];
     let mut conv = Convolution::init_for_test(3, 2, 2);
-    let mut ctx = ConvolutionContext::new(0.01);
+    let mut ctx = ConvolutionContext::init(0.01);
 
     let dE_dY: Array3<f64> = Array3::from_elem((3, 3, 3), 1.0);
     

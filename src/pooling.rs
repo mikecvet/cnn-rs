@@ -26,7 +26,7 @@ pub struct PoolingContext<'a> {
 
 impl<'a> PoolingContext<'a> {
   pub fn 
-  new () -> Self
+  init () -> Self
   {
     PoolingContext { 
       input: None,
@@ -37,7 +37,7 @@ impl<'a> PoolingContext<'a> {
 
 impl Pooling {
   pub fn 
-  new (
+  init (
     kernel_rows: usize,
     kernel_cols: usize) -> Self
   {
@@ -95,8 +95,9 @@ impl Pooling {
     for p in patches.iter() {
       let depth = p.data.dim().2;
       let v: Vec<f64> = (0..depth).map(|i| {
-        p.data.slice(s![.., .., i])
-             .fold(f64::NEG_INFINITY, |acc, &v| acc.max(v))
+        p.data.
+          slice(s![.., .., i])
+          .fold(f64::NEG_INFINITY, |acc, &v| acc.max(v))
       }).collect();
 
       a.slice_mut(s![p.x, p.y, ..]).assign(&Array1::from(v));
@@ -108,6 +109,8 @@ impl Pooling {
     a
   }
 
+  /// Runs backward propagation in this layer of the network. Returns gradients of the loss
+  /// based on kernel weights.
   pub fn 
   back_propagation (&self, input: &Array3<f64>, ctx: &PoolingContext) -> Array3<f64>
   {
@@ -118,6 +121,7 @@ impl Pooling {
       let height = p.data.shape()[1];
       let num_kernels = p.data.shape()[2];
       
+      // Collect maximum set of values from across the patch
       let max_values = p.data
         .fold_axis(Axis(0), f64::NEG_INFINITY, |&a, &b| a.max(b))
         .fold_axis(Axis(0), f64::NEG_INFINITY, |&a, &b| a.max(b));
@@ -125,6 +129,10 @@ impl Pooling {
       for i in 0..height {
         for j in 0..width {
           for k in 0..num_kernels {
+
+            // Find the indices of the maximal value in the patch, sets the 
+            // element in the output matrix to the corresponding element in the 
+            // input matrix using patch coordinates
             if approx_equal(p.data[[i, j, k]], max_values[k], EPSILON) {
               output[[
                 p.x * self.kernel_rows + i, 
@@ -153,7 +161,7 @@ mod tests {
     let image_height = 6;
     let kernel_dim = 2;
     let image = Array3::<f64>::zeros((image_height, image_width, 3));
-    let pooling = Pooling::new(kernel_dim, kernel_dim);
+    let pooling = Pooling::init(kernel_dim, kernel_dim);
     let patches = pooling.patches(&image);
 
     // Should create 9 patches as the image size is 5x5
@@ -169,7 +177,7 @@ mod tests {
   test_patches_size () 
   {
     let image = Array3::<f64>::zeros((6, 6, 3));
-    let pooling = Pooling::new(2, 2);
+    let pooling = Pooling::init(2, 2);
     let patches = pooling.patches(&image);
 
     // Should create patches of size 2x2x3
@@ -183,7 +191,7 @@ mod tests {
   test_patches_indices () 
   {
     let image = Array3::<f64>::zeros((6, 6, 3));
-    let pooling = Pooling::new(2, 2);
+    let pooling = Pooling::init(2, 2);
     let patches = pooling.patches(&image);
 
     // Check whether patches have correct x and y
@@ -206,7 +214,7 @@ mod tests {
   test_patches_data () 
   {
     let image = Array3::<f64>::from_shape_vec((6, 6, 3), (0..108).map(|x| x as f64).collect()).unwrap();
-    let pooling = Pooling::new(2, 2);
+    let pooling = Pooling::init(2, 2);
     let patches = pooling.patches(&image);
 
     assert_eq!(
@@ -226,8 +234,8 @@ mod tests {
   test_forward_propagation_output_shape () 
   {
     let image = Array3::<f64>::zeros((26, 26, 16));
-    let mut pooling = Pooling::new(2, 2);
-    let mut ctx = PoolingContext::new();
+    let mut pooling = Pooling::init(2, 2);
+    let mut ctx = PoolingContext::init();
 
     let result = pooling.forward_propagation(&image, &mut ctx);
     
@@ -244,8 +252,8 @@ mod tests {
         (0..108).map(|x| x as f64).collect()
     ).unwrap();
 
-    let mut pooling = Pooling::new(2, 2);
-    let mut ctx = PoolingContext::new();
+    let mut pooling = Pooling::init(2, 2);
+    let mut ctx = PoolingContext::init();
 
     let result = pooling.forward_propagation(&image, &mut ctx);
 
@@ -259,8 +267,8 @@ mod tests {
   test_back_propagation_output_shape () 
   {
     let image = Array3::<f64>::zeros((26, 26, 16));
-    let mut pooling = Pooling::new(2, 2);
-    let mut ctx = PoolingContext::new();
+    let mut pooling = Pooling::init(2, 2);
+    let mut ctx = PoolingContext::init();
 
     let dE_dY = Array3::<f64>::zeros((26, 26, 16));
 

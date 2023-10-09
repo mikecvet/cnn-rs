@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::approx::*;
 
+/// The Softmax layer computes a final probability distribution over
+/// the output dimension, based on inputs from the max pooling and 
+/// convlutional layers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Softmax
 {
@@ -16,6 +19,8 @@ pub struct Softmax
   pub bias: Array1<f64>
 }
 
+/// Caches data used during forward propagation which is necessary
+/// for backward propagation during training
 pub struct SoftmaxContext<'a> {
   alpha: f64,
   input: Option<&'a Array3<f64>>,
@@ -24,14 +29,9 @@ pub struct SoftmaxContext<'a> {
   output: Option<Array1<f64>>
 }
 
-pub struct TrainingData 
-{
-  pub layers: Vec<Array2<f64>>
-}
-
 impl<'a> SoftmaxContext<'a> {
   pub fn 
-  new (alpha: f64) -> Self 
+  init (alpha: f64) -> Self 
   {
     SoftmaxContext { 
       alpha: alpha, 
@@ -57,7 +57,7 @@ softmax (x: &Array1<f64>) -> Array1<f64>
 
 impl Softmax {
   pub fn 
-  new (input_size: usize, output_size: usize) -> Self 
+  init (input_size: usize, output_size: usize) -> Self 
   {
     let mut rng = StdRng::from_entropy();
     let mut weights = Array2::zeros((input_size, output_size)) / input_size as f64;
@@ -77,8 +77,10 @@ impl Softmax {
     }
   }
 
+  /// Similar initialization as above, but assigns stable values to weights to facilitate 
+  /// unit testing.
   pub fn 
-  new_for_test (input_size: usize, output_size: usize) -> Self 
+  init_for_test (input_size: usize, output_size: usize) -> Self 
   {
     let weights = Array2::ones((input_size, output_size)) / input_size as f64;
     let bias = Array1::zeros(output_size);
@@ -89,6 +91,8 @@ impl Softmax {
     }
   }
 
+  /// Runs forward propagation in this layer of the network. Flattens input, computes probabilities of 
+  /// outputs based on the dot product with this layer's weights and softmax outputs.
   pub fn 
   forward_propagation<'a> (&mut self, input: &'a Array3<f64>, ctx: &mut SoftmaxContext<'a>) -> Array1<f64> 
   {
@@ -104,18 +108,21 @@ impl Softmax {
     probabilities
   }
 
+  /// Runs backward propagation in this layer of the network. Computes and returns the gradient of the loss
+  /// based on weights, bias, and input from earlier layers.
   pub fn 
   back_propagation (&mut self, dE_dY: &Array1<f64>, ctx: &SoftmaxContext) -> Array3<f64>
   {
     let mut indx = 0;
 
     for gradient in dE_dY {
-      if (*gradient) != 0.0 {
-        let transformation_eq = ctx.dot_result.as_ref().unwrap().mapv(f64::exp);
-        let S_total = transformation_eq.sum();
 
-        let mut dY_dZ: Array1<f64> = -transformation_eq[indx] * transformation_eq.clone() / S_total.pow(2);
-        dY_dZ[indx] = transformation_eq[indx] * (S_total - transformation_eq[indx]) / S_total.pow(2);
+      if (*gradient) != 0.0 {
+        let exp_vector = ctx.dot_result.as_ref().unwrap().mapv(f64::exp);
+        let sum_exp = exp_vector.sum();
+
+        let mut dY_dZ: Array1<f64> = -exp_vector[indx] * exp_vector.clone() / sum_exp.pow(2);
+        dY_dZ[indx] = exp_vector[indx] * (sum_exp - exp_vector[indx]) / sum_exp.pow(2);
 
         let dZ_dw = ctx.flattened.as_ref().unwrap();
         let dZ_db = 1.0 as f64;
@@ -130,10 +137,10 @@ impl Softmax {
         self.weights = self.weights.clone().sub(ctx.alpha * dE_dw);
         self.bias = self.bias.clone().sub(ctx.alpha * dE_db);
 
-        // Force the matrix into a 3D shape; kind of awkward APIs
+        // Force the matrix into a 3D shape; kind of awkward ndarray API
         return dE_dX
-        .into_shape(ctx.input.unwrap().shape()).unwrap()
-        .into_dimensionality().unwrap();
+          .into_shape(ctx.input.unwrap().shape()).unwrap()
+          .into_dimensionality().unwrap();
       }
 
       indx += 1;
@@ -188,8 +195,8 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3)); // adjust shape as necessary
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size);
-    let mut ctx = SoftmaxContext::new(0.01);
+    let mut softmax = Softmax::init_for_test(input_size, output_size);
+    let mut ctx = SoftmaxContext::init(0.01);
     let result = softmax.forward_propagation(&image, &mut ctx);
 
     assert_eq!(result.dim(), output_size, "Output shape is incorrect");
@@ -203,8 +210,8 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size);
-    let mut ctx = SoftmaxContext::new(0.01);
+    let mut softmax = Softmax::init_for_test(input_size, output_size);
+    let mut ctx = SoftmaxContext::init(0.01);
 
     let result = softmax.forward_propagation(&image, &mut ctx);
 
@@ -223,8 +230,8 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3)); 
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size);
-    let mut ctx = SoftmaxContext::new(0.01);
+    let mut softmax = Softmax::init_for_test(input_size, output_size);
+    let mut ctx = SoftmaxContext::init(0.01);
 
     softmax.forward_propagation(&image, &mut ctx);
 
@@ -241,8 +248,8 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size);
-    let mut ctx = SoftmaxContext::new(0.01);
+    let mut softmax = Softmax::init_for_test(input_size, output_size);
+    let mut ctx = SoftmaxContext::init(0.01);
 
     softmax.forward_propagation(&image, &mut ctx);
 
@@ -260,8 +267,8 @@ mod tests
     let output_size = 10;
     let image = Array3::<f64>::ones((13, 13, 16));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size);
-    let mut ctx = SoftmaxContext::new(0.01);
+    let mut softmax = Softmax::init_for_test(input_size, output_size);
+    let mut ctx = SoftmaxContext::init(0.01);
     
     softmax.forward_propagation(&image, &mut ctx);
 
@@ -279,8 +286,8 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size);
-    let mut ctx = SoftmaxContext::new(0.01);
+    let mut softmax = Softmax::init_for_test(input_size, output_size);
+    let mut ctx = SoftmaxContext::init(0.01);
 
     let original_weights = softmax.weights.clone();
     let original_bias = softmax.bias.clone();
@@ -301,8 +308,8 @@ mod tests
     let output_size = 3;
     let image = Array3::<f64>::ones((2, 2, 3));
 
-    let mut softmax = Softmax::new_for_test(input_size, output_size);
-    let mut ctx = SoftmaxContext::new(0.01);
+    let mut softmax = Softmax::init_for_test(input_size, output_size);
+    let mut ctx = SoftmaxContext::init(0.01);
 
     let original_weights = softmax.weights.clone();
     let original_bias = softmax.bias.clone();
@@ -313,5 +320,34 @@ mod tests
 
     assert_eq!(original_weights, softmax.weights, "Weights modified unexpectedly");
     assert_eq!(original_bias, softmax.bias, "Bias modified unexpectedly");
+  }
+
+  #[test]
+  fn
+  test_back_propagation_values ()
+  {
+    let input_size = 12;
+    let output_size = 3;
+    let image = Array3::<f64>::ones((2, 2, 3));
+
+    let mut softmax = Softmax::init_for_test(input_size, output_size);
+    let mut ctx = SoftmaxContext::init(0.01);
+
+    softmax.forward_propagation(&image, &mut ctx);
+
+    let mut dE_dY = Array1::zeros(output_size);
+    dE_dY[0] = 0.123;
+
+    softmax.back_propagation(&dE_dY, &ctx);
+
+    println!("bias: {:?}", softmax.bias);
+
+    assert!(approx_equal(softmax.weights[[0, 0]], 0.08306, 1e-6));
+    assert!(approx_equal(softmax.weights[[1, 1]], 0.083469, 1e-6));
+    assert!(approx_equal(softmax.weights[[2, 2]], 0.083469, 1e-6));
+
+    assert!(approx_equal(softmax.bias[0], -0.000273, 1e-6));
+    assert!(approx_equal(softmax.bias[1], 0.0001366, 1e-6));
+    assert!(approx_equal(softmax.bias[2], 0.0001366, 1e-6));
   }
 }

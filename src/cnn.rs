@@ -64,8 +64,8 @@ impl CNN
     CNN { 
       hyper_params: hyper_params,
       convolution_layer: Convolution::init(16, 3, 3), 
-      max_pooling_layer: Pooling::new(2, 2), 
-      softmax_layer: Softmax::new(13 * 13 * 16, OUTPUT_LAYER_SIZE) 
+      max_pooling_layer: Pooling::init(2, 2), 
+      softmax_layer: Softmax::init(13 * 13 * 16, OUTPUT_LAYER_SIZE) 
     }
   }
 
@@ -111,9 +111,9 @@ impl CNN
   {
     let a: Array2<f64> = image.mapv(|x| x as f64 / 255.0);
 
-    let mut c_ctx = ConvolutionContext::new(self.hyper_params.learning_rate);
-    let mut p_ctx = PoolingContext::new();
-    let mut s_ctx = SoftmaxContext::new(self.hyper_params.learning_rate);
+    let mut c_ctx = ConvolutionContext::init(self.hyper_params.learning_rate);
+    let mut p_ctx = PoolingContext::init();
+    let mut s_ctx = SoftmaxContext::init(self.hyper_params.learning_rate);
 
     let c_results = self.convolution_layer.forward_propagation(&a, &mut c_ctx);
     let p_results = self.max_pooling_layer.forward_propagation(&c_results, &mut p_ctx);
@@ -134,9 +134,9 @@ impl CNN
   {
     let a: Array2<f64> = image.mapv(|x| x as f64 / 255.0);
 
-    let mut c_ctx = ConvolutionContext::new(self.hyper_params.learning_rate);
-    let mut p_ctx = PoolingContext::new();
-    let mut s_ctx = SoftmaxContext::new(self.hyper_params.learning_rate);
+    let mut c_ctx = ConvolutionContext::init(self.hyper_params.learning_rate);
+    let mut p_ctx = PoolingContext::init();
+    let mut s_ctx = SoftmaxContext::init(self.hyper_params.learning_rate);
 
     let c_results = self.convolution_layer.forward_propagation(&a, &mut c_ctx);
     let p_results = self.max_pooling_layer.forward_propagation(&c_results, &mut p_ctx);
