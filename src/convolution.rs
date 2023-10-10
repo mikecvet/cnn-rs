@@ -1,8 +1,8 @@
-use std::ops::{Add, Sub};
+use std::ops::Sub;
 
 use ndarray::{s, Array1, Axis};
 use ndarray_rand::RandomExt;
-use ndarray_rand::rand_distr::{Standard, Uniform};
+use ndarray_rand::rand_distr::Uniform;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 

@@ -1,6 +1,5 @@
 use ndarray::{s, Array1, Array3, Axis};
 use ndarray_rand::RandomExt;
-use ndarray_rand::rand_distr::{Standard, Uniform};
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -56,16 +55,15 @@ impl Pooling {
 
     for x in 0..(image.shape()[0] / self.kernel_rows) {
       for y in 0..(image.shape()[1] / self.kernel_cols) {
-
         let p = Patch {
           x: x,
           y: y,
           data: image.slice(
-              s![
-                (x * self.kernel_rows)..(x * self.kernel_rows + self.kernel_rows), 
-                (y * self.kernel_cols)..(y * self.kernel_cols + self.kernel_cols), 
-                ..]
-              ).to_owned()
+            s![
+              (x * self.kernel_rows)..(x * self.kernel_rows + self.kernel_rows), 
+              (y * self.kernel_cols)..(y * self.kernel_cols + self.kernel_cols), 
+              ..]
+            ).to_owned()
         };
 
         data.push(p);
@@ -129,7 +127,6 @@ impl Pooling {
       for i in 0..height {
         for j in 0..width {
           for k in 0..num_kernels {
-
             // Find the indices of the maximal value in the patch, sets the 
             // element in the output matrix to the corresponding element in the 
             // input matrix using patch coordinates
