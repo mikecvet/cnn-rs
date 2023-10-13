@@ -1,4 +1,4 @@
-use ndarray::{Array2, Array3};
+use ndarray::Array3;
 
 #[derive(Debug)]
 pub struct Patch {

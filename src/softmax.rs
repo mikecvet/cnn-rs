@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Sub};
 
 use ndarray::{Array1, Array2, Array3, Axis};
 use ndarray_rand::RandomExt;
