@@ -8,7 +8,7 @@ The `cnn-rs` binary is a simple CNN with just three layers; a convolutional, max
 
 ![The author's handwritten digits](https://github.com/mikecvet/cnn-rs/blob/master/static/cnn_diagram.png)
 
-Based on empiracal testing, this model can reach a 98%+ accuracy rate against the MNIST test corpus.
+Based on empirical testing, this model can reach a 98%+ accuracy rate against the MNIST test corpus.
 
 ![Entropy loss and accuracy visualization across 1 training epoch](https://github.com/mikecvet/cnn-rs/blob/master/static/loss.png)
 
