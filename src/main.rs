@@ -82,8 +82,8 @@ load_and_train (cnn: &mut CNN, args: &Args, training_data: ImageData, labels: La
         if indx % BATCH_SIZE == 0 {
           time = timer.stop();
 
-          println!("{} examples, batch {}: avg loss {:.4} accuracy {:.1}% avg time {}ms", 
-            indx, BATCH_SIZE, loss / BATCH_SIZE as f64, 100.0 * (accuracy as f64 / BATCH_SIZE as f64), time);
+          println!("{} examples, avg loss {:.4} accuracy {:.1}% avg batch time {}ms", 
+            indx, loss / BATCH_SIZE as f64, 100.0 * (accuracy as f64 / BATCH_SIZE as f64), time);
 
           // This output makes plotting data easier
           //println!("{:.4},{:.4}", loss / BATCH_SIZE as f64, (accuracy as f64 / BATCH_SIZE as f64));
@@ -177,13 +177,15 @@ load_images (dir_path: &str) -> Result<Vec<(String, Array2<u8>)>, Box<dyn std::e
 ///   0.jpeg
 ///   1.jpeg
 /// etc
+/// 
+/// This brittle behavior is inteded for use with the --cheat flag :)
 fn 
 train_on_custom_images (cnn: &mut CNN, file_name: &String, image: &Array2<u8>) 
 {
   let parts = file_name.split(".").collect::<Vec<&str>>();
   if parts.len() == 2 && parts[0].len() == 1 {
     let label = parts[0].parse::<u8>().unwrap();
-    for _ in 0..5 {
+    for _ in 0..3 {
       cnn.train(image, label);
     }
   }
@@ -230,7 +232,11 @@ main ()
   .arg(arg!(--input_dir <VALUE>)
     .required(false)
     .value_name("FILE_PATH")
-    .help("path to a directory containing 28x28 px jpeg files"))  
+    .help("path to a directory containing 28x28 px jpeg files"))
+  .arg(arg!(--cheat)
+    .required(false)
+    .value_name("BOOL")
+    .help("if true, will use the contents of files under the input_dir argument to fine-tune the model before predicting outputs"))
   .get_matches();
 
   let training_image_path_opt = matches.get_one::<String>("training_images").cloned();
@@ -241,6 +247,7 @@ main ()
   let learning_rate_opt = matches.get_one::<String>("learning_rate").cloned();
   let load_opt = matches.get_one::<String>("load").cloned();
   let save_opt = matches.get_one::<bool>("save").cloned();
+  let cheat_opt = matches.get_one::<bool>("cheat").cloned();
   let input_dir_opt = matches.get_one::<String>("input_dir").cloned();
 
   let args = Args::new( 
@@ -251,6 +258,7 @@ main ()
       save_opt,
       load_opt,
       input_dir_opt,
+      cheat_opt,
       epochs_opt,
       learning_rate_opt
   );
@@ -296,8 +304,10 @@ main ()
       match load_images(&dir) {
         Ok(image_pairs) => {
           for (file_name, image) in image_pairs.iter() {
-            train_on_custom_images(&mut cnn, file_name, image);
-            
+            if args.cheat {
+              train_on_custom_images(&mut cnn, file_name, image);
+            }
+
             let digit = cnn.predict(image);
             println!("predict that the digit in {} is {}", file_name, digit);
           }
