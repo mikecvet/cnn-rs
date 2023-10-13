@@ -31,3 +31,16 @@ Options:
   -h, --help                    Print help
   -V, --version 
 ```
+
+If you modify the code, there are quite a few tests you can use to verify behavior:
+
+```
+$ cargo test
+...
+running 30 tests
+test approx::tests::test_equal ... ok
+test approx::tests::test_not_equal ... ok
+test convolution::tests::test_init_dimensions ... ok
+...
+test pooling::tests::test_back_propagation_output_shape ... ok
+```
