@@ -1,6 +1,8 @@
 # CNN-RS: A Convolutional Neural Network Implementation in Rust
 
-This is an implementation of a Convolutional Neural Network in Rust, which is specifically written to process the raw [MNIST dataset](http://yann.lecun.com/exdb/mnist/), as well as other input images in the same format, and classify those images as digits in the range from 0 to 9. This network is built from scratch, leveraging only the [ndarray](https://crates.io/crates/ndarray) crate for linear algebraic operations. The program can also be configured to test against a directory of custom jpeg images, formatted as 28x28 pixel grayscale squares with an inverted colors (255 is black, 0 is white). For example, I tested its accuracy against these:
+This is an implementation of a Convolutional Neural Network in Rust, which is specifically written to process the raw [MNIST dataset](http://yann.lecun.com/exdb/mnist/), as well as other input images in the same format, and classify those images as digits in the range from 0 to 9. You can download the dataset from that link. 
+
+This neural network is built from scratch, leveraging only the [ndarray](https://crates.io/crates/ndarray) crate for linear algebraic operations. The program can also be configured to test against a directory of custom jpeg images, formatted as 28x28 pixel grayscale squares with an inverted colors (255 is black, 0 is white). For example, I tested its accuracy against these:
 
 ![The author's handwritten digits](https://github.com/mikecvet/cnn-rs/blob/master/static/digits.png)
 
@@ -44,3 +46,27 @@ test convolution::tests::test_init_dimensions ... ok
 ...
 test pooling::tests::test_back_propagation_output_shape ... ok
 ```
+
+An example run, which:
+ - trains based on the MNIST training images and label files
+ - specifies two full training epochs over that training set
+ - loads previously-trained model data from disk
+ - overwrites the updated model data to disk
+ - specifies a learning rate of 1e-6
+
+looks like this:
+
+```
+~/code/cnn-rs ~>> ./target/release/cnn-rs --training_images ./train-images.idx3-ubyte --training_labels ./train-labels.idx1-ubyte --epochs 2 --save --load ./cnn.model --learning_rate 0.000001
+
+loaded model data from ./cnn.model
+>> epoch 1 / 2
+1000 examples, avg loss 0.0881 accuracy 98.3% avg batch time 781ms
+2000 examples, avg loss 0.0732 accuracy 98.6% avg batch time 790ms
+3000 examples, avg loss 0.0683 accuracy 98.9% avg batch time 797ms
+4000 examples, avg loss 0.0962 accuracy 98.3% avg batch time 792ms
+...
+60000 examples, avg loss 0.0604 accuracy 98.6% avg batch time 779ms
+model data saved to cnn.model
+```
+
