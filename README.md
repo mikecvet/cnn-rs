@@ -1,6 +1,8 @@
 # CNN-RS: A Convolutional Neural Network Implementation in Rust
 
-This is an implementation of a Convolutional Neural Network in Rust, which is specifically written to process the raw [MNIST dataset](http://yann.lecun.com/exdb/mnist/), as well as other input images in the same format, and classify those images as digits in the range from 0 to 9. You can download the dataset from that link. 
+This is an implementation of a Convolutional Neural Network in Rust, which is specifically written to process the raw [MNIST dataset](http://yann.lecun.com/exdb/mnist/), as well as other input images in the same format, and classify those images as digits in the range from 0 to 9. You can download the dataset from that link.
+
+This repository is discussed [in this blog post](https://mikecvet.medium.com/convolutional-neural-networks-from-the-ground-up-for-the-ml-adjacent-35d530ab26f3).
 
 This neural network is built from scratch, leveraging only the [ndarray](https://crates.io/crates/ndarray) crate for linear algebraic operations. The program can also be configured to test against a directory of custom jpeg images, formatted as 28x28 pixel grayscale squares with an inverted colors (255 is black, 0 is white). For example, I tested its accuracy against these:
 
